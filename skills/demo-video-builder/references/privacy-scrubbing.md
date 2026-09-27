@@ -1,5 +1,9 @@
 # Privacy scrubbing
 
+> **Mask private data, not the product.** Blur secrets, personal data and other customers — but leave real
+> code, API names and tool labels as recorded unless the owner asks otherwise (many reviewers want the
+> product untouched). v3 repaints demo-authored words instead of blurring them (`references/real-pixel-footage.md`).
+
 Real screen recordings leak sensitive data everywhere. **Every shipped frame must be clean.** This is the
 single most common way a demo video goes out with something it shouldn't. Treat it as a hard gate, not a
 nicety.

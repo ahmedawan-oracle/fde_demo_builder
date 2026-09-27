@@ -1,8 +1,12 @@
 # Python deps for the demo builder
 edge-tts>=7.0        # neural text-to-speech for narration
+pillow>=10.0         # credit.py (mandatory end-screen credit), v3 extract_clips.py
+numpy>=1.26          # v3 extract_clips.py (per-pixel median stills)
 # faster-whisper>=1.0  # optional: word-timestamps to sync opener/outro beats to VO
 
 # Also required on PATH (not pip):
 #   ffmpeg + ffprobe  (>= 6)
 # For animated opener/outro (optional), install with npm in the project folder:
 #   npm i puppeteer puppeteer-screen-recorder
+# v3 films render deterministically with puppeteer only:
+#   npm i puppeteer

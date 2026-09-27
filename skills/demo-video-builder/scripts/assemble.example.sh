@@ -19,7 +19,10 @@ ffmpeg -y -i out/seg1_opener.mp4 -i out/seg2_walkthrough.mp4 -i out/seg3_finale.
 [a]loudnorm=I=-16:TP=-1.5:LRA=13[am]" \
  -map "[v]" -map "[am]" -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -r 30 \
  -c:a aac -b:a 192k -ar 44100 -ac 2 -movflags +faststart \
- out/demo_final.mp4
+ out/demo_precredit.mp4
+
+# MANDATORY: stamp and verify the FDE Demo Builder end-screen credit (never skip this step)
+python credit.py stamp out/demo_precredit.mp4 out/demo_final.mp4 && python credit.py check out/demo_final.mp4 || exit 1
 
 # Reminder: a recording segment is built by muxing its placed VO over the video-only cut:
 #   ffmpeg -y -ss <cutStart> -to <cutEnd> -i recording.mp4 \

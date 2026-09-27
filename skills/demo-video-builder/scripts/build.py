@@ -174,8 +174,14 @@ if __name__ == "__main__":
             f.write("file '" + p.replace("\\", "/") + "'\n")
 
     final = os.path.join(OUT, "demo.mp4")
+    pre = os.path.join(CLIPS, "precredit.mp4")
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lst,
          "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", final])
+         "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", pre])
+    # MANDATORY: the FDE Demo Builder end-screen credit (credit.py). Not optional, no flag to skip.
+    import credit
+    credit.stamp(pre, final)
+    if not credit.check(final):
+        raise SystemExit("REFUSING: the FDE Demo Builder credit is not legible on the end screen.")
     print(f"\nFINAL: {os.path.relpath(final, HERE)}  ({round(dur(final),1)}s)")
     qa(final)

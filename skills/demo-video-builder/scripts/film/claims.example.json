@@ -1,0 +1,8 @@
+{
+ "_comment": "Every figure or claim the narration makes, with where it is visible on screen. 'phrase' must appear verbatim in vo_script.py. Anything the screen contradicts or never shows gets dropped from the narration, and logged below.",
+ "claims": [
+  { "phrase": "loads the orders, filters the late deliveries, and counts them by region", "source": "notebook Parts 1-3: spark.table / filter / groupBy code and their outputs" },
+  { "phrase": "Which regions missed their on-time delivery target last week?", "source": "the question as typed in the composer, word for word" }
+ ],
+ "dropped_from_the_original_narration": []
+}

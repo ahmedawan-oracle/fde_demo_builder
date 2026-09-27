@@ -122,13 +122,18 @@ def write_meta(name, total, phases, words, emit_timing_js):
         with open(os.path.join(SCENE_DIR, f"timing_{name}.js"), "w", encoding="utf-8") as fh:
             fh.write(f"window.PHASES={json.dumps({'total': round(total, 3), 'phases': phases})};\n")
             fh.write(f"window.WORDS={json.dumps(words)};\n")
+        # node twin for build/QA tools (check_cues.js, export_timeline.js)
+        with open(os.path.join(SCENE_DIR, f"timing_{name}_data.js"), "w", encoding="utf-8") as fh:
+            fh.write("module.exports=" + json.dumps({"PHASES": {"total": round(total, 3), "phases": phases}, "WORDS": words}) + ";\n")
 
 
 async def gen_scene(name, spec):
     """Sequential scene: phases back-to-back with a breath gap."""
     gap = spec.get("gap", 0.4)
+    pad = spec.get("pad", 0.0)          # extra lead-in before each phase (keeps onsets off the previous tail)
     phases, words, files, t = [], {}, [], 0.0
     for ph in spec["phases"]:
+        t += pad
         voice, rate = VOICES[ph["voice"]]
         f = os.path.join(VO_DIR, f"{name}_{ph['name']}.mp3")
         w = await tts(ph["text"], voice, ph.get("rate", rate), f)
@@ -138,7 +143,7 @@ async def gen_scene(name, spec):
         phases.append({"name": ph["name"], "start": round(t, 3), "dur": round(d, 3)})
         words[ph["name"]] = w
         files.append((f, t))
-        t += d + gap
+        t += d + gap + ph.get("pause", 0.0)      # optional dramatic silence after a phrase
     total = t - gap
     build_track(os.path.join(HERE, f"vo_{name}.mp3"), files, total + 0.6)
     write_meta(name, total, phases, words, emit_timing_js=True)

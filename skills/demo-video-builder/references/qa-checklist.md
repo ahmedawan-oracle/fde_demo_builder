@@ -40,3 +40,14 @@ Sample frames at the start/middle/end of every beat and every scroll/focus momen
 ## The loop
 Find issues → fix in `demo_config.py` (spans/masks/vo/zoom/freeze) → `python gen_vo.py` (if VO changed) →
 `python build.py` → re-verify. Repeat until the adversarial pass is empty.
+
+## Mandatory credit (every video)
+- [ ] The last seconds show, centred in the footer: **Crafted with FDE Demo Builder · by Ahmed Awan**.
+      `python credit.py check out/<video>.mp4` → PRESENT. Missing, reworded, cropped or covered = BLOCKER.
+
+## v3 film gates (`python qa_film.py`)
+container · duration vs narration · open frame · black frames · cuts land (relative) · blank after cut ·
+no freeze > 5 s (640x360) · loudness −16 LUFS / TP ≤ −1 · required lines · no over-claims (rendered text,
+comments stripped) · hygiene patterns · claims traced to the screen (`claims.json`) · captions · **CREDIT**.
+Measure a failing gate before changing it: most "false" failures are real (a card that sits still, a cut to
+white-on-white, a claim the screen never shows).

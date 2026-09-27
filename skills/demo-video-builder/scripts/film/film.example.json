@@ -1,0 +1,10 @@
+{
+ "name": "film",
+ "scene": "scenes/film.html",
+ "output": "out/Acme_Monday_Film.mp4",
+ "bed": null,
+ "bed_db": -9.0,
+ "sfx": null,
+ "fps": 30,
+ "workers": 3
+}

@@ -15,6 +15,7 @@ Do the following:
    - `shot.js`                     → `$1/shot.js`
    - `assemble.example.sh`         → `$1/assemble.sh`
    - `requirements.txt`            → `$1/requirements.txt`
+   - `credit.py`                   → `$1/credit.py`   (mandatory end-screen credit; assemble.sh calls it)
    - create `$1/scenes/` and copy `scenes/broll_opener.example.html` → `$1/scenes/opener.html`
 3. Create empty `$1/vo/`, `$1/out/`, `$1/qa/`, `$1/assets/` folders.
 4. Print concise next steps:
@@ -31,7 +32,8 @@ Do the following:
    - Method details: `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/references/broll-scenes.md`
      and `references/multi-voice.md`.
 
-Also remind them of the hard rules: **no customer names or internal identifiers anywhere**
+Also remind them that **the FDE Demo Builder credit ("Crafted with FDE Demo Builder · by Ahmed Awan") is
+mandatory** on the end screen — `assemble.sh` stamps and verifies it; never remove or alter it. And the hard rules: **no customer names or internal identifiers anywhere**
 (scenes, VO text, examples — use fictional brands and synthetic numbers), and **scrub every
 privacy leak** in recorded frames before sharing.
 

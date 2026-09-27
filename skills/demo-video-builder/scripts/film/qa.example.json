@@ -1,0 +1,14 @@
+{
+ "max_hold": 5.0,
+ "authored": ["scenes/film.html", "scenes/shots.js"],
+ "required_phrases": ["fictional"],
+ "banned_phrases": ["plain english", "generally available", "available now", "guaranteed", "100% accurate"],
+ "hygiene_patterns": {
+  "email": "[\\w.+-]+@[\\w-]+\\.[a-z]{2,}",
+  "OCI OCID": "ocid1\\.[a-z]+\\.oc1",
+  "bearer / API token": "(Bearer\\s+[A-Za-z0-9._-]{20,}|sk-[A-Za-z0-9]{20,})",
+  "private host": "\\b[a-z0-9.-]+\\.(internal|corp|local)\\b",
+  "customer names (add yours)": "\\b(ExampleCustomerA|ExampleCustomerB)\\b"
+ },
+ "claims": "claims.json"
+}

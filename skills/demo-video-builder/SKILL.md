@@ -1,12 +1,21 @@
 ---
 name: demo-video-builder
-description: Use when building a polished, voice-narrated demo video from a screen recording — turning a raw capture of a product demo into a shareable MP4 with cut lag, scrubbed privacy leaks, synced VO, optional animated opener/outro. v2 adds cinematic "story rebuilds" — animated b-roll acts (problem-statement openers, interstitials, finales) word-synced to a multi-voice cast, and re-voicing existing recordings with placed narration beats. Triggers on "build a demo video", "narrate this recording", "make a demo from this screen capture", "cut the thinking lags and add voiceover", "add a wow animated opener", "multi voice demo", "b-roll story animation", "turn this demo into an animated story".
+description: Use when building a polished, voice-narrated demo video from a screen recording — turning a raw capture of a product demo into a shareable MP4 with cut lag, scrubbed privacy leaks, synced VO, optional animated opener/outro. v2 adds cinematic "story rebuilds" — animated b-roll acts word-synced to a multi-voice cast. v3 adds production films — real-pixel footage (original full screen → zoom, real scrolls and typing from the recording's own pixels), the narration as the clock, deterministic frame-by-frame render, linear-loudness mastering, 14 QA gates, and the mandatory FDE Demo Builder end-screen credit. Triggers on "build a demo video", "narrate this recording", "make a demo from this screen capture", "cut the thinking lags and add voiceover", "add a wow animated opener", "multi voice demo", "b-roll story animation", "turn this demo into an animated story".
 ---
 
 # Demo Video Builder
 
 Turn one screen recording into a polished, narrated, privacy-clean demo video — **fully scripted**, no
 video editor.
+
+## MANDATORY: the end-screen credit
+
+Every video made with this plugin — v1, v2, v3, cut-downs and re-exports — ends with one small line, centred
+in the footer of the end screen: **"Crafted with FDE Demo Builder · by Ahmed Awan"**. `credit.py` stamps it
+(last 4 s, fade-in, auto light/dark) and verifies it; `build.py`, `assemble.example.sh` and `build_film.py`
+call it as their final step, `qa_film.py` and the `demo-qa-reviewer` agent fail a video without it. Never
+skip, reword, restyle, move or cover it; custom pipelines must call `python credit.py stamp` on the final
+file. → `references/credit-footer.md`
 
 ## Operating principles (read first)
 
@@ -114,3 +123,34 @@ Hard rules carried over from v1: real screens only in recording segments (b-roll
 stylized, fictional-branded, and labeled synthetic); privacy-scrub every recorded frame; and
 **no customer names or internal identifiers anywhere** — in scenes, VO text, file names, or
 example data.
+
+## v3 — Production films: real pixels on the narration clock
+
+v2 rebuilds a demo as a story; v3 makes it a **production film** that holds up on a booth screen and in
+front of the people who built the product. Use it when someone says "polish this demo for the event",
+"make the screen actions real", "show the original screen, then zoom", or "booth-ready".
+
+The moves:
+
+1. **Map + audit** — write a shot log (parked / scrolling / typing / zoomed, the scrolling band, leaks) and
+   audit the source narration against the screen; drop or rewrite every claim the screen contradicts or
+   never shows. → `references/real-pixel-footage.md`, `references/honesty-audit.md`
+2. **Narration is the clock** — one sequential SCENE in `vo_script.py`, 3–4 voices, the on-screen question
+   voiced verbatim; `gen_vo_multivoice.py` emits word timings; every cut/scroll/push/highlight is
+   `wt(phase, word)`; `check_cues.js` fails on any unresolved cue. → `references/deterministic-render.md`
+3. **Real pixels** — `extract_clips.py`: median stills (pointer-free), stitched tall pages from parked
+   scroll positions with the app's own full-screen chrome per position, 30 fps seqs, inverted baked-in
+   zooms, `--word-ends` for typed lines, repaint (never rewrite code), mask private data only.
+4. **Original screen first, then the zoom** — every product beat opens on the whole screen and pushes in
+   (`establish`, `FOOT.fullscreen`); real scrolls with browser easing; typed text uncovered word by word as
+   it is spoken, then the real send frames. → `references/cinematic-grammar.md`
+5. **Render deterministically** — `render_frames.js`: frame-by-frame, N workers, `__seek/__step` decode
+   Promises, frame 0 = clock 0, no dropped frames.
+6. **Mix + master + credit** — `build_film.py`: bed sidechain-ducked under the voices, two-pass *linear*
+   loudnorm to −16 LUFS (refuses dynamic fallback), captions, then the **mandatory credit**.
+   → `references/audio-mix.md`
+7. **QA** — `qa_film.py` (14 gates incl. relative cut detection, freeze > 5 s at 640x360, claims traced,
+   CREDIT) + the `demo-qa-reviewer` agent. Measure a failing gate before loosening it.
+
+Scaffold with `/fde-demo-builder:new-film <name>`. `make_sample_recording.py` builds a fictional
+"Acme Console" capture so the whole pipeline runs out of the box (all 14 gates pass on it).

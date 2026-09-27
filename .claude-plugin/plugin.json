@@ -1,10 +1,27 @@
 {
   "name": "fde-demo-builder",
-  "version": "2.0.0",
-  "description": "Turn a raw screen recording into a polished, VO-narrated, privacy-scrubbed demo video — fully scripted (ffmpeg + edge-tts + headless Chrome), no video editor. v2 adds cinematic story rebuilds: word-synced animated b-roll acts (openers/interstitials/finales) and multi-voice narration placed over existing recordings. Built for FDE product demos.",
+  "version": "3.0.0",
+  "description": "Turn a raw screen recording into a polished, VO-narrated demo video — fully scripted (ffmpeg + edge-tts + headless Chrome), no video editor. v2: word-synced animated b-roll acts + multi-voice narration. v3: booth-ready production films — real-pixel footage (original full screen → zoom, real scrolls and typing), narration as the clock, deterministic render, linear-loudness mastering, 14 QA gates. Every video carries the mandatory 'Crafted with FDE Demo Builder · by Ahmed Awan' end-screen credit.",
   "author": {
     "name": "Ahmed Awan - Forward Deployed Engineering Team",
     "email": "232676096+ahmedawan-oracle@users.noreply.github.com"
   },
-  "keywords": ["demo", "video", "ffmpeg", "voiceover", "edge-tts", "screen-recording", "fde", "b-roll", "multi-voice", "animation", "word-sync"]
+  "keywords": [
+    "animation",
+    "b-roll",
+    "demo",
+    "deterministic-render",
+    "edge-tts",
+    "fde",
+    "ffmpeg",
+    "loudness",
+    "multi-voice",
+    "production-film",
+    "qa-gates",
+    "real-pixels",
+    "screen-recording",
+    "video",
+    "voiceover",
+    "word-sync"
+  ]
 }
