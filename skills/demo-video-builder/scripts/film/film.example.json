@@ -2,9 +2,30 @@
  "name": "film",
  "scene": "scenes/film.html",
  "output": "out/Acme_Monday_Film.mp4",
- "bed": null,
- "bed_db": -9.0,
- "sfx": null,
  "fps": 30,
- "workers": 3
+ "workers": 3,
+ "bed": null,
+ "bed_db": -12.0,
+ "carve": true,
+ "carve_opts": {
+  "strength": 0.5,
+  "threshold": "auto",
+  "level_match": false
+ },
+ "voice_preset": null,
+ "beats": null,
+ "bed_offset": 0.0,
+ "bed_end": "tail",
+ "sfx": null,
+ "captions": {
+  "config": "scenes/captions.json",
+  "burn": true,
+  "vtt": true,
+  "luma": "out/caption_luma.json"
+ },
+ "storyboard": "STORYBOARD.md",
+ "ledger": "media.jsonl",
+ "exports": [],
+ "lint": "normal",
+ "canary": true
 }

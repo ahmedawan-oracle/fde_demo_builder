@@ -112,8 +112,10 @@
     }
     function seqFrame(sh, t) {
       const c = CL[sh.clip], n = c.frames, from = (sh.play && sh.play.from) || 1;
-      const at = sh.play ? sh.play.at : sh.t0, rate = (sh.play && sh.play.rate) || 1;
-      let f = from + Math.floor(Math.max(0, t - at) * c.fps * rate + 1e-6);
+      if (sh.play && sh.play.map) return 1 + Math.floor(clamp(sh.play.map(t), 0, 1) * (n - 1) + 1e-6);   // speed ramp: map(t) → 0..1 of the clip
+      const at = sh.play ? sh.play.at : sh.t0, rate = (sh.play && sh.play.rate) || 1, dt = Math.max(0, t - at);
+      // rate may be a number or a speed-ramp lane [[t, rate], …] (lib/vfx.js VFX.ramp — trapezoid integral of the lane)
+      let f = (Array.isArray(rate) && root.VFX && root.VFX.ramp) ? root.VFX.ramp.frameAt(rate, dt, c.fps, n, from) : from + Math.floor(dt * c.fps * (Array.isArray(rate) ? 1 : rate) + 1e-6);
       if (f > n) {
         if (sh.play && sh.play.loop) { const a = sh.play.loop[0] + 1, b = sh.play.loop[1] + 1; f = a + ((f - n - 1) % (b - a + 1)); }
         else f = n;

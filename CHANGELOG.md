@@ -1,5 +1,46 @@
 # Changelog
 
+## 4.0.0 — HyperFrames-inspired production craft
+
+v4 keeps everything v3 does and adds the craft that turns a clean demo into a film people remember. The ideas come from
+HeyGen's open-source HyperFrames (Apache-2.0; see NOTICE.md), re-expressed for our real-pixel, narration-is-the-clock
+pipeline. Everything still renders on your laptop; nothing needs an account or a cloud. The fictional "Acme Console"
+sample passes all 51 gates end to end (`make_sample_recording.py` → `build_film.py` → `qa_film.py`).
+
+- **Motion and seams.** `lib/seams.js`: velocity-matched seams (cut-the-curve, zoom-through and its inverse, waterfall,
+  nudge/whip, rack-focus), waterfall entries, carriers. A `seams.json` ledger declares each cut; `gates/seam_gate.py`
+  measures the rendered frames and fails any cut that stops early, mirrors direction, dissolves, or flashes white.
+- **Camera.** `lib/camera.js`: punch-in/out, zoom-out reveal, focus pull, caret-follow, dolly zoom, pose ladder, drift-to-
+  zero. `gates/motion_diag.py`: per-shot camera curves, zoom budget (≤ 88 % of frame, ≤ 2× source pixels), onion-skin sheet.
+- **Captions and overlays.** `lib/captions.js`: a burned-in caption lane on the narration's own word times (drop / rail /
+  embed, eight corporate presets, fit-text) that matches the SRT. `lib/overlays.js`: lower-thirds, stat cards, hero word,
+  pull-quote, PiP frame, lockup, CTA close. `gates/overlay_gate.py`: safe zones, clipping, collisions, caption shape.
+- **Audio.** `audio/carve_bed.py`: the bed ducks only in the bands the narration occupies; mono→stereo pan fix (+3 dB that
+  `aformat` silently lost). `audio/voice_presets.py`: clean / broadcast / warm / telephone / PA chains and per-phase level
+  match. `audio/beat_grid.py`: beats.json from a bed so cuts land on bars. `gates/audio_gate.py`: voice-over-bed ≥ 12 LU,
+  duck depth, even voices, true peak.
+- **QA and determinism.** `gates/lint_scene.py` (wall-clock code, CSS transitions, unseeded random, remote refs, fonts),
+  `gates/canary.py` (render twice, compare hashes), `gates/snapshot.py` (golden frames + diff contact sheet),
+  `tools/doctor.py` (ffmpeg / Node / Chrome / edge-tts / fonts / RAM / disk preflight, `--json`), `tools/fonts_localize.py`,
+  `tools/audit_text.js` (overflow + WCAG contrast). Gates are plug-ins (`gates/*.py`, `GATE_NAMES` + `run(ctx)`);
+  CREDIT always runs last and cannot be disabled.
+- **Planning and review.** `templates/BRIEF.example.md` + `tools/brief.py` (message, audience, destination, what is real,
+  stated-vs-inferred), `templates/STORYBOARD.example.md` + `tools/storyboard.py` (beat arithmetic against the narration,
+  truthfulness tag per beat, storyboard.html sketch sheet), `templates/design.example.md`, `gates/text_gate.py` (words per
+  second and per beat, on-screen text budget, hooks that open with table names).
+- **Blocks.** `lib/blocks.js`: chat reveal with human typing rhythm, count-up that lands on the spoken number, state rail /
+  HUD / agent tag, flash cut and freeze dressing, title lockup and dead-still close, focus zoom + click ring, the shared
+  elastic envelope.
+- **Media and export.** `tools/ledger.py` + `gates/ledger_gate.py`: every asset's source and licence in `media.jsonl`;
+  the render refuses remote URLs. `tools/export.py`: booth loop, LinkedIn, YouTube, vertical, square, GIF teaser and a
+  share pack from one master, each re-checked for the credit. `tools/timeline.py`: human-readable timeline.
+  `templates/skin_tokens.example.json`: brand tokens for re-skins.
+- **Finishing.** `lib/vfx.js`: vignette, seeded grain, bloom, matte reveal, haze — recreated scenes only. `tools/grade.py` +
+  `gates/grade_gate.py`: levels/cast normalisation that proves product pixels were never recoloured.
+- **Extractor.** Per-clip `"file"` (films that cut between recordings), `"fps"`, `"width"`, `--out`; `play.map` speed ramps
+  in the footage lane.
+- **Credit.** Unchanged and mandatory: "Crafted with FDE Demo Builder · by Ahmed Awan" on every output and every export.
+
 ## 3.0.0 — Production films
 
 **New: v3 film workflow** (`/fde-demo-builder:new-film`, `scripts/film/`)

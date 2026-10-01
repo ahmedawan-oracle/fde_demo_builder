@@ -33,7 +33,8 @@ async function renderChunk(browser, k, i0, i1, errs) {
   await p.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1.5 });
   p.setDefaultNavigationTimeout(240000);
   await p.goto(URL, { waitUntil: 'load', timeout: 240000 });
-  await new Promise(r => setTimeout(r, 1200));
+  await p.evaluate(() => document.fonts.ready);                      // glyph metrics are final before frame 0
+  await new Promise(r => setTimeout(r, 600));
   await p.evaluate(t => { document.body.classList.remove('pre'); return window.__seek(t); }, i0 / FPS);
   const ff = ffmpegPipe(partName(k));
   const write = buf => new Promise(res => { if (!ff.stdin.write(buf)) ff.stdin.once('drain', res); else res(); });
@@ -53,7 +54,12 @@ async function renderChunk(browser, k, i0, i1, errs) {
 (async () => {
   const t0 = Date.now(); const errs = [];
   const b = await puppeteer.launch({ headless: 'new', executablePath: chromePath(),
-    args: ['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1.5', '--window-size=1280,760', '--font-render-hinting=none', '--disable-lcd-text'] });
+    args: ['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1.5', '--window-size=1280,760', '--font-render-hinting=none', '--disable-lcd-text',
+           '--force-color-profile=srgb', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--allow-file-access-from-files']
+           .concat(process.env.RENDER_SOFTWARE_GPU === '1' ? ['--disable-gpu'] : []) }).catch(e => {
+    if (/3221225595|0xC0000409|STATUS_STACK_BUFFER_OVERRUN/.test(String(e && e.message))) console.error('Chrome crashed at launch (0xC0000409): set PUPPETEER_EXECUTABLE_PATH to the system Chrome');
+    throw e; });
+  const chromeVersion = await b.version();
   const bounds = []; for (let k = 0; k < WORKERS; k++) bounds.push([Math.round(k * N / WORKERS), Math.round((k + 1) * N / WORKERS)]);
   const counts = await Promise.all(bounds.map(([i0, i1], k) => renderChunk(b, k, i0, i1, errs)));
   await b.close();
@@ -63,7 +69,7 @@ async function renderChunk(browser, k, i0, i1, errs) {
   if (r.status !== 0) { console.error('concat failed'); process.exit(3); }
   bounds.forEach((_, k) => { try { fs.unlinkSync(partName(k)); } catch (e) {} }); try { fs.unlinkSync(list); } catch (e) {}
   const nb = spawnSync('ffprobe', ['-v', 'error', '-count_frames', '-select_streams', 'v:0', '-show_entries', 'stream=nb_read_frames', '-of', 'csv=p=0', outAbs], { encoding: 'utf8' }).stdout.trim();
-  console.log(JSON.stringify({ out: OUT, frames: N, rendered: counts.reduce((a, c) => a + c, 0), probed: nb, fps: FPS, seconds: N / FPS, workers: WORKERS, errors: errs, wall_s: Math.round((Date.now() - t0) / 1000) }));
+  console.log(JSON.stringify({ out: OUT, frames: N, rendered: counts.reduce((a, c) => a + c, 0), probed: nb, fps: FPS, seconds: N / FPS, workers: WORKERS, chrome: chromeVersion, errors: errs, wall_s: Math.round((Date.now() - t0) / 1000) }));
   if (errs.length) { console.error(errs.join('\n')); process.exit(2); }
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });

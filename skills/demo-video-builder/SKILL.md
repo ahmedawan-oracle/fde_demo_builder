@@ -153,4 +153,33 @@ The moves:
    CREDIT) + the `demo-qa-reviewer` agent. Measure a failing gate before loosening it.
 
 Scaffold with `/fde-demo-builder:new-film <name>`. `make_sample_recording.py` builds a fictional
-"Acme Console" capture so the whole pipeline runs out of the box (all 14 gates pass on it).
+"Acme Console" capture so the whole pipeline runs out of the box (every gate passes on it).
+
+## v4 — Production craft (HyperFrames-inspired)
+
+v4 keeps the v3 pipeline and layers the craft a booth film needs. Ideas come from HeyGen's open-source HyperFrames
+(Apache-2.0, see NOTICE.md), re-expressed for our real-pixel, narration-is-the-clock architecture: pure `frame(t)`,
+puppeteer, ffmpeg, python. Nothing needs an account or a cloud. Every reference is ≤ 180 lines and carries the measured
+numbers; read the one for the layer you are touching.
+
+| Layer | Lib / tool | Gate | Reference |
+|---|---|---|---|
+| Seams: cut-the-curve, zoom-through (+inverse), waterfall, nudge, rack-focus, carriers, the vector ledger `seams.json` | `lib/seams.js` | `gates/seam_gate.py` (ledger lint, motion across the cut, white flash, stage ground) | `motion-doctrine.md` |
+| Camera: punch in/out, zoom-out reveal, focus pull, caret-follow, dolly, pose ladder, zoom budget (≤ 88 % frame, ≤ 2× source px) | `lib/camera.js` (`--curves` CLI) | `gates/motion_diag.py` | `camera-moves.md` |
+| Caption lane on the narration's word times (drop / rail / embed, 8 presets) + lower thirds, stat cards, hero word, pull-quote, PiP | `lib/captions.js`, `lib/overlays.js`, `tools/captions_srt.py` | `gates/overlay_gate.py` (safe zones, overflow, collisions, shape, contrast, hero scarcity) | `captions-and-overlays.md` |
+| Audio: band-limited voice carve, pan upmix (+3 dB), voice presets, level match, beat grid | `audio/carve_bed.py`, `voice_presets.py`, `beat_grid.py` | `gates/audio_gate.py` (voice over bed ≥ 12 LU, duck depth, voices even, TP, upmix) | `audio-carve-and-beats.md` |
+| Lint + determinism: wall-clock code, CSS transitions, unseeded random, remote refs, fonts; render twice and compare; golden frames | `gates/lint_scene.py`, `tools/doctor.py`, `tools/fonts_localize.py`, `tools/audit_text.js` | `gates/canary.py`, `gates/snapshot.py`, `lint_scene` | `lint-and-determinism.md` |
+| Planning: BRIEF.md intake, STORYBOARD.md beat arithmetic + sketch sheet + lock, design tokens, text-beat economics | `tools/brief.py`, `tools/storyboard.py` | `gates/text_gate.py` | `brief-storyboard-review.md` |
+| Blocks: chat reveal, KPI count-up, state rail / HUD / agent tag, flash + freeze dressing, title lockup, CTA close, focus zoom | `lib/blocks.js` (+ `scenes_blocks_demo.html`) | — | `blocks-catalog.md` |
+| Media: ledger with licences, export presets (booth loop, LinkedIn, YouTube, vertical, square, GIF, share pack), timeline printout, skin tokens | `tools/ledger.py`, `tools/export.py`, `tools/timeline.py` | `gates/ledger_gate.py` | `media-ledger-and-export.md` |
+| Finishing: vignette, seeded grain, bloom, matte, haze — recreated layers only; truthful footage normalisation | `lib/vfx.js`, `tools/grade.py` | `gates/grade_gate.py` (UI colour truth, effects off footage) | `vfx-and-grading.md` |
+
+**How the pieces meet.** `build_film.py` runs plan (timeline + seams + captions export) → preflight (doctor, lint,
+camera ladder, storyboard lock, canary) → render → mix (carve) → master → captions → **credit** → ledger → exports →
+storyboard truth pass. `qa_film.py` runs the built-in gates, then every `gates/*.py` module (`GATE_NAMES` + `run(ctx)`),
+and CREDIT last — it cannot be disabled. The scene loads the libs it uses; overlays and captions live in screen space,
+outside `#camera`; nothing from VFX may touch the footage lane.
+
+**Working rules (v4).** Write `seams.json` before the shots. One route per phase; no idle wobble. Captions are an
+overlay, not a reserved band; one group at a time, ≤ 6 words / 2.5 s. Every spoken figure is in `claims.json` and on
+screen. Mask private data only; never recolour product pixels. Everything the scene loads is a local file.

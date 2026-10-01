@@ -26,6 +26,9 @@ Scrub the capture at 1 fps and write `SHOTLOG.md` before touching code:
 | `seq` | real motion (a send, a spinner, a chart drawing) | plays at 30 fps on the film clock: `play:{at, from, rate, loop:[a,b]}` |
 | `page` | a long document the presenter scrolled | stitch the **parked scroll positions** into one tall page (`layers[].off` = doc y); later layers skip their top `trim` px so no half-clipped row sits on a seam |
 
+A film that cuts between several recordings gives each clip its own `"file"`; long speed-ramped sequences can set
+`"fps": 15` and `"width"` to keep the frame count and disk size sane; `--out DIR` writes somewhere other than `broll/`.
+
 `page` + `chrome` also saves the original full screen for each parked position (`chrome_k.jpg`). The film
 draws the page inside the app's real chrome, and swaps the chrome as the scroll passes each position, so
 the app's own state (table-of-contents highlight, scrollbar thumb) follows the scroll.

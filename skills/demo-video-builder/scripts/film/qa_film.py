@@ -18,7 +18,8 @@
  11  hygiene          no identifier pattern (emails, tokens, internal hosts, customer names) in authored text
  12  claims traced    every figure/claim the narration speaks is listed in claims.json with its on-screen source
  13  captions         SRT exists, ordered, ends inside the film
- 14  CREDIT           the mandatory "Crafted with FDE Demo Builder · by Ahmed Awan" line is on the end screen
+ 14+ plug-in gates   gates/*.py modules (seams, motion, overlays, audio, lint, canary, snapshots, ledger, text, grade)
+ 15  CREDIT           the mandatory "Crafted with FDE Demo Builder · by Ahmed Awan" line is on the end screen
 """
 import array, json, os, re, subprocess, sys
 
@@ -40,9 +41,11 @@ def gate(name, ok, detail=''):
         fails.append(name)
 
 
-def frame(t, w=160, h=90):
+def frame(t, w=160, h=90, crop=None):
+    """Grey frame at t; crop=(fraction of height kept from the top) measures above the caption lane."""
+    vf = ('crop=iw:ih*%.3f:0:0,' % crop if crop else '') + 'scale=%d:%d,format=gray' % (w, h)
     r = subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-ss', '%.3f' % t, '-i', FILM, '-frames:v', '1',
-                        '-vf', 'scale=%d:%d,format=gray' % (w, h), '-f', 'rawvideo', '-'], capture_output=True)
+                        '-vf', vf, '-f', 'rawvideo', '-'], capture_output=True)
     seg = array.array('B', r.stdout)
     m = sum(seg) / max(1, len(seg))
     sd = (sum((x - m) ** 2 for x in seg) / max(1, len(seg))) ** 0.5
@@ -71,7 +74,9 @@ while t < dur - 0.6:
     t += 0.5
 gate('black frames', not bad, 'offenders %s' % (bad[:6] or 'none'))
 
-cuts = [c for c in TL['cuts'] if 1.0 < c < dur - 1.0]
+# cuts that the seam ledger owns are measured by gates/seam_gate.py (both sides move, so the legacy change tests do not apply)
+SEAM_CUTS = [w.get('cut') for w in TL.get('seams', []) if isinstance(w, dict) and isinstance(w.get('cut'), (int, float))]
+cuts = [c for c in TL['cuts'] if 1.0 < c < dur - 1.0 and not any(abs(c - sc) < 0.05 for sc in SEAM_CUTS)]
 changed = lambda a, b: 100.0 * sum(1 for x, y in zip(a, b) if abs(x - y) > 24) / len(a)
 weak = []
 for c in cuts:
@@ -88,10 +93,13 @@ for c in cuts:
 gate('blank after cut', not blank, 'offenders %s' % (blank or 'none'))
 
 hold, run, t = float(Q.get('max_hold', 5.0)), 0.0, 1.0
-prev, frozen = frame(t, 640, 360)[3], []
+# a burned-in caption lane changes pixels every word, so the freeze test looks only above it (top 82 % of the frame)
+CAP_BURN = bool((C.get('captions') or {}).get('config')) and (C.get('captions') or {}).get('burn') is not False
+FREEZE_CROP = 0.82 if CAP_BURN else None
+prev, frozen = frame(t, 640, 360, FREEZE_CROP)[3], []
 while t < dur - 1.0:
     t += 0.5
-    cur = frame(t, 640, 360)[3]
+    cur = frame(t, 640, 360, FREEZE_CROP)[3]
     run = run + 0.5 if sum(abs(x - y) for x, y in zip(prev, cur)) / len(cur) < 0.25 else 0.0
     if run >= hold:
         frozen.append(round(t, 1))
@@ -135,6 +143,27 @@ if os.path.exists(SRT):
     gate('captions', ok, '%d cues' % len(secs))
 else:
     gate('captions', False, 'missing ' + SRT)
+
+# ---------------------------------------------------------------- plug-in gates (gates/*.py)
+# Each module exposes GATE_NAMES and run(ctx) -> [(name, ok, detail)]. qa.json "gates" lists the modules to run
+# (default: every module in gates/). The mandatory CREDIT gate always runs last and cannot be disabled.
+import importlib, glob
+ctx = {'film': FILM, 'dur': dur, 'fps': FPS, 'timeline': TL, 'project': HERE, 'cfg': C, 'qa': Q, 'frame': frame,
+       'scene_html': os.path.join(HERE, C.get('scene', 'scenes/film.html')), 'shots_js': os.path.join(HERE, 'scenes', 'shots.js'),
+       'script': script, 'srt': SRT, 'vo_phases': json.load(open(os.path.join(HERE, 'vo', NAME + '_phases.json'))) if os.path.exists(os.path.join(HERE, 'vo', NAME + '_phases.json')) else None,
+       'words': json.load(open(os.path.join(HERE, 'vo', NAME + '_words.json'))) if os.path.exists(os.path.join(HERE, 'vo', NAME + '_words.json')) else None}
+gdir = os.path.join(HERE, 'gates')
+wanted = Q.get('gates')
+mods = wanted if wanted is not None else sorted(os.path.splitext(os.path.basename(f))[0] for f in glob.glob(os.path.join(gdir, '*.py')) if not os.path.basename(f).startswith('_'))
+if mods:
+    sys.path.insert(0, gdir)
+    for mname in mods:
+        try:
+            M = importlib.import_module(mname)
+            for name, ok, detail in M.run(ctx):
+                gate(name, ok, detail)
+        except Exception as e:                      # a broken gate is a failed gate, never a skipped one
+            gate(mname, False, 'gate crashed: %s: %s' % (type(e).__name__, str(e)[:160]))
 
 import credit as CR
 gate('CREDIT', CR.check(FILM, verbose=False), '"%s" on the end screen (mandatory)' % CR.CREDIT_TEXT)

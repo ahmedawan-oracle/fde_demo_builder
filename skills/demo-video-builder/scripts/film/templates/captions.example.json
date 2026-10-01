@@ -1,0 +1,53 @@
+{
+ "_doc": [
+  "captions.example.json -> copy to scenes/captions.json. ONE source of truth for the burned-in lane AND the sidecar:",
+  "  node scenes/lib/captions.js scenes/timing_film_data.js scenes/captions.json --out out/caption_groups.json --js scenes/captions_data.js",
+  "  python tools/captions_srt.py out/caption_groups.json out/<film>.srt --vtt out/<film>.vtt",
+  "style:  anchor | broadcast | documentary | keynote | ink | conference | typewriter | clipwipe  (CAP.STYLES; table in references/captions-and-overlays.md)",
+  "mode:   default fate of every phrase: rail (verbatim lane) | drop (not shown) | embed (big centred, one caption at a time)",
+  "phases: per-phase fate or {fate, style, ink:'dark'|'light'} — e.g. drop the title phase whose words are already the title card",
+  "overrides: per-word tweaks keyed by phase + word (+ n-th occurrence): em (accent + weight 700), display (spoken 'twenty three' -> '23'),",
+  "           drop (filler in a real-audio segment), color / weight / scale (scale <= 1.10 on the rail). No x/y nudges: they break the collision gate.",
+  "grouping: optional overrides of the measured defaults (gap 0.35 s, commaGap 0.25 s, maxDur 2.5 s, minWords 2, minDur 0.5 s, lead 0.08 s, tail 0.6 s,",
+  "           maxWords / maxChars default to the style's tokens; density:true lowers the cap to 2/3/4 words at > 3.5 / > 2.5 words per second)",
+  "luma: optional probe result (python gates/overlay_gate.py --probe) {phase: {mean, p95}} -> dark ink on bright screens (> 150), bare light text (< 60), scrim between",
+  "Everything here is fictional (Acme, synthetic data). Keep this file in qa.json 'authored' so display substitutions pass the hygiene / over-claims gates.",
+  "A phase whose words are already on screen (title card, closing card) is 'drop' - captioning it twice is the text-on-text failure the overlay gate flags."
+ ],
+ "style": "anchor",
+ "mode": "rail",
+ "burn": true,
+ "stage": [
+  1280,
+  720
+ ],
+ "creditKeepOut": 4.0,
+ "phases": {
+  "title": "drop",
+  "answer": {
+   "fate": "rail",
+   "style": "typewriter"
+  },
+  "close": "drop"
+ },
+ "overrides": [
+  {
+   "phase": "answer",
+   "word": "governed",
+   "n": 1,
+   "em": true
+  },
+  {
+   "phase": "nb",
+   "word": "region.",
+   "display": "region."
+  }
+ ],
+ "grouping": {
+  "gap": 0.35,
+  "maxDur": 2.5,
+  "tail": 0.6,
+  "maxWords": 6,
+  "maxChars": 40
+ }
+}

@@ -1,7 +1,7 @@
 {
   "name": "fde-demo-builder",
-  "version": "3.0.0",
-  "description": "Turn a raw screen recording into a polished, VO-narrated demo video — fully scripted (ffmpeg + edge-tts + headless Chrome), no video editor. v2: word-synced animated b-roll acts + multi-voice narration. v3: booth-ready production films — real-pixel footage (original full screen → zoom, real scrolls and typing), narration as the clock, deterministic render, linear-loudness mastering, 14 QA gates. Every video carries the mandatory 'Crafted with FDE Demo Builder · by Ahmed Awan' end-screen credit.",
+  "version": "4.0.0",
+  "description": "Turn a raw screen recording into a polished, VO-narrated demo video — fully scripted (ffmpeg + edge-tts + headless Chrome), no video editor. v2: word-synced animated b-roll + multi-voice narration. v3: booth-ready production films from real pixels (original screen → zoom, real scrolls and typing), narration as the clock, deterministic render, linear-loudness mastering, QA gates. v4: HyperFrames-inspired production craft — velocity-matched seams with a seam gate, camera kit + motion diagnostics, caption lane + overlays, band-limited voice carve + audio gates, scene lint + determinism canary + golden snapshots + doctor, BRIEF/STORYBOARD review loop, blocks library, media ledger + export presets, honest finishing. Every video carries the mandatory 'Crafted with FDE Demo Builder · by Ahmed Awan' end-screen credit.",
   "author": {
     "name": "Ahmed Awan - Forward Deployed Engineering Team",
     "email": "232676096+ahmedawan-oracle@users.noreply.github.com"
@@ -9,18 +9,28 @@
   "keywords": [
     "animation",
     "b-roll",
+    "blocks",
+    "captions",
     "demo",
+    "determinism",
     "deterministic-render",
     "edge-tts",
+    "export-presets",
     "fde",
     "ffmpeg",
+    "lint",
     "loudness",
+    "lower-thirds",
+    "media-ledger",
     "multi-voice",
     "production-film",
     "qa-gates",
     "real-pixels",
     "screen-recording",
+    "seams",
+    "storyboard",
     "video",
+    "voice-carve",
     "voiceover",
     "word-sync"
   ]

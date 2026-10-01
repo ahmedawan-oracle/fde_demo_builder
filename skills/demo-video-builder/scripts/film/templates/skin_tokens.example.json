@@ -1,0 +1,53 @@
+{
+ "_doc": [
+  "skin_tokens.example.json — brand tokens for a v3 film skin (fictional Acme defaults = the colours film.example.html ships with today).",
+  "A skin is a flat set of typed slots. Every scalar becomes a CSS custom property --<id> on the scene's :root (colour, font,",
+  "number, string); image slots fill [data-var-src]; string slots fill [data-var-text]. The scene's CSS reads var(--paper) etc.",
+  "with these same defaults, so a film without a skin renders exactly as before.",
+  "Precedence (ours, the opposite of HyperFrames): skin file > per-row batch override > the :root values authored in the scene.",
+  "Apply the skin BEFORE the first __seek (render_frames.js forwards ?skin=<relative json> on the scene URL; film.json \"skin\" names it).",
+  "What can NEVER be a token: the narration text (it is the clock), fps, 1920x1080, the total length, the codec, and the mandatory",
+  "FDE Demo Builder credit (credit.py picks its own colour from the end screen). `portrays` tags mark identity slots: subject_* must",
+  "stay fictional in examples, host_identity (the depicted product's own UI) is never repainted.",
+  "Prove a re-skin differentially: render one still with the skin and one with a probe skin (paper/ink inverted); > 5 % of 160x90",
+  "grey pixels must differ, else the binding never reached the DOM."
+ ],
+ "name": "acme-night",
+ "tokens": {
+  "paper":      {"type": "color",  "default": "#082A34", "role": "style", "description": "stage background (top of the gradient)"},
+  "paper2":     {"type": "color",  "default": "#204A56", "role": "style", "description": "stage background (bottom of the gradient)"},
+  "ink":        {"type": "color",  "default": "#E9F3F9", "role": "style", "description": "title and lower-third text"},
+  "ink-soft":   {"type": "color",  "default": "#ECDEC3", "role": "style", "description": "subtitle text"},
+  "muted":      {"type": "color",  "default": "#81A9AB", "role": "style", "description": "caption line, lower-third label, glow"},
+  "accent":     {"type": "color",  "default": "#E56B5E", "role": "style", "description": "rule, highlight boxes, lower-third edge"},
+  "gold":       {"type": "color",  "default": "#E8C874", "role": "style", "description": "first line of the closing card"},
+  "black":      {"type": "color",  "default": "#05161C", "role": "style", "description": "head fade plate"},
+  "title-font": {"type": "font",   "default": "Georgia, serif", "role": "style", "description": "title + closing card face (local @font-face or a system family)"},
+  "body-font":  {"type": "font",   "default": "\"Helvetica Neue\", Arial, sans-serif", "role": "style", "description": "subtitles, captions, lower-thirds"},
+  "title-size": {"type": "number", "default": 64, "min": 44, "max": 84, "step": 2, "unit": "px", "role": "layout", "description": "title h1 size on the 1280x720 stage"},
+  "title":      {"type": "string", "default": "Monday, answered.", "role": "content", "portrays": ["subject_tagline"], "binds": "#tTitle"},
+  "subtitle":   {"type": "string", "default": "From an analyst’s notebook to a question anyone can ask", "role": "content", "portrays": ["subject_tagline"], "binds": "#tSub"},
+  "caption":    {"type": "string", "default": "Fictional company · synthetic data", "role": "content", "portrays": ["authority_badge"], "binds": "#tCap",
+                 "description": "the honesty line; keep it unless the film shows a real customer's own data with their approval"},
+  "logo":       {"type": "image",  "default": null, "role": "content", "portrays": ["subject_logo"], "binds": "#logo", "description": "local file inside the project (assets/…); null hides the slot"},
+  "density":    {"type": "enum",   "default": "booth", "options": ["booth", "desk"], "role": "layout", "description": "booth = larger type, fewer words on screen"}
+ },
+ "forbidden_tokens": ["narration", "fps", "width", "height", "total", "codec", "credit"],
+ "css_snippet": ":root{--paper:#082A34;--paper2:#204A56;--ink:#E9F3F9;--ink-soft:#ECDEC3;--muted:#81A9AB;--accent:#E56B5E;--gold:#E8C874;--black:#05161C;--title-font:Georgia,serif;--body-font:\"Helvetica Neue\",Arial,sans-serif;--title-size:64px}",
+ "batch": {
+  "_doc": [
+   "Batch re-skin: rows.json → one film per row. Each row = token overrides merged over this skin + an output name.",
+   "The narration clock, VO and footage lane are shared; only the picture is re-rendered per row (skins change pixels), the",
+   "audio master is reused unless a row changes bed_db. Output template keys: {name}, {index} and any string/number/boolean",
+   "row key; a missing placeholder or two rows mapping to one output is an error. Rows that try to set a forbidden token",
+   "(narration, fps, size, total, codec, credit) are refused. Every output still passes qa_film.py and the CREDIT gate.",
+   "build_film.py --batch rows.json --output \"out/{name}.mp4\" writes out/batch_manifest.json {row, skin, output, duration, qa, credit}."
+  ],
+  "rows_example": [
+   {"name": "Acme_Monday_Film_night", "tokens": {}},
+   {"name": "Acme_Monday_Film_day", "tokens": {"paper": "#F4F1EA", "paper2": "#E6E1D6", "ink": "#1C1815", "ink-soft": "#4A443C", "muted": "#6E7F80", "black": "#F4F1EA"}},
+   {"name": "Acme_Monday_Film_nocaption", "tokens": {"caption": ""}}
+  ],
+  "output": "out/{name}.mp4"
+ }
+}

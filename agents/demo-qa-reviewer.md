@@ -37,7 +37,13 @@ to learn the beat boundaries and where masks/zoom were applied.
 5. **v3 films:** each product beat must open on the original full screen before zooming; every spoken figure
    must be visible at that moment and listed in `claims.json`; if `qa_film.py` exists, run it and report
    every FAIL.
-6. If a `demo_config.py` is present, sanity-check that each beat's masks plausibly cover the leaks for that
+6. **v4 films:** run `python qa_film.py` and report every FAIL and WARN by gate name. For a seam that fails `seams move`,
+   run `python gates/seam_gate.py probe <film> <cut>` and quote the measured vectors. Read `out/storyboard.html` (the truth
+   pass) against `STORYBOARD.md`: every beat's `real:` tag must match what the frames show; a placeholder is a BLOCKER.
+   Extract stills at caption mid-points and check the lane against the checklist in `references/captions-and-overlays.md`
+   (one group at a time, inside title-safe, never over the credit). Check `media_index.md`: every music / footage / font
+   asset has a licence; UNKNOWN is a BLOCKER for a shipped film.
+7. If a `demo_config.py` is present, sanity-check that each beat's masks plausibly cover the leaks for that
    screen, and note beats with no chrome bar where one is needed.
 
 ## Output

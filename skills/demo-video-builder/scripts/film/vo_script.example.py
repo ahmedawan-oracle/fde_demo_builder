@@ -10,7 +10,7 @@ VOICES = {
     "narrator":  ("en-US-AndrewNeural",      "+4%"),   # the story, the turns, the close
     "analyst":   ("en-US-AvaNeural",         "+5%"),   # first person: the notebook
     "lead":      ("en-US-ChristopherNeural", "+0%"),   # first person: the business question
-    "assistant": ("en-US-BrianNeural",       "+8%"),   # the product's own voice
+    "assistant": ("en-US-BrianNeural",       "+2%"),   # the product's own voice (+8 % read 3.5 words/s — too fast for the text gate)
 }
 
 SCENES = {

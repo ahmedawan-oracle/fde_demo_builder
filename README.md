@@ -110,6 +110,43 @@ Method docs: [real-pixel-footage](skills/demo-video-builder/references/real-pixe
 [audio-mix](skills/demo-video-builder/references/audio-mix.md) ·
 [credit-footer](skills/demo-video-builder/references/credit-footer.md).
 
+## v4 — Production craft (HyperFrames-inspired)
+
+Version 4 adds the craft that turns a clean demo into a film people remember, re-expressed from HeyGen's open-source
+HyperFrames for our real-pixel pipeline (see NOTICE.md). Everything still renders on your laptop.
+
+- **Seams, not cuts** — a `seams.json` ledger declares each cut; the outgoing screen is still moving when the next
+  arrives, same axis, matched speed. The seam gate measures the rendered frames and fails any cut that stops early,
+  mirrors direction, dissolves or flashes white.
+- **Camera kit** — punch-ins, zoom-out reveals, focus pulls, caret-follow; a zoom budget stops pushes past 88 % of the
+  frame or 2× the recording's pixels; diagnostics print each shot's camera curve.
+- **Captions and overlays** — a burned-in caption lane on the narration's own word times (eight quiet presets) that
+  matches the SRT; lower thirds, stat cards, a scarce hero word, pull-quotes, PiP; a gate for safe zones, clipping,
+  collisions and contrast.
+- **Audio** — the bed ducks only in the bands the voice occupies; a mono→stereo fix recovers 3 dB; voice presets;
+  per-phase level match; a beat grid so cuts land on bars; gates for separation, duck depth, even voices, true peak.
+- **QA and determinism** — `lint_scene` (wall-clock code, CSS transitions, remote refs, fonts), a canary that renders
+  twice and compares, golden snapshots, `doctor` preflight, text overflow + WCAG contrast audit. Gates are plug-ins;
+  CREDIT stays last.
+- **Planning and review** — `BRIEF.md` intake, `STORYBOARD.md` beat arithmetic rendered as a sketch sheet you lock
+  before anything is built, design tokens, a text gate for beats that talk too fast or screens that say too much.
+- **Blocks** — chat reveal with human typing rhythm, KPI count-up that lands on the spoken number, state rail / HUD,
+  flash cut, title lockup, CTA close.
+- **Media and export** — a ledger with every asset's source and licence; export presets (booth loop, LinkedIn, YouTube,
+  vertical, square, GIF, share pack), each re-checked for the credit.
+- **Finishing** — vignette, seeded grain, haze for recreated scenes only; a colour-truth gate proves product pixels were
+  never recoloured.
+
+Method docs: [motion-doctrine](skills/demo-video-builder/references/motion-doctrine.md) ·
+[camera-moves](skills/demo-video-builder/references/camera-moves.md) ·
+[captions-and-overlays](skills/demo-video-builder/references/captions-and-overlays.md) ·
+[audio-carve-and-beats](skills/demo-video-builder/references/audio-carve-and-beats.md) ·
+[lint-and-determinism](skills/demo-video-builder/references/lint-and-determinism.md) ·
+[brief-storyboard-review](skills/demo-video-builder/references/brief-storyboard-review.md) ·
+[blocks-catalog](skills/demo-video-builder/references/blocks-catalog.md) ·
+[media-ledger-and-export](skills/demo-video-builder/references/media-ledger-and-export.md) ·
+[vfx-and-grading](skills/demo-video-builder/references/vfx-and-grading.md).
+
 ## Quickstart
 
 ```

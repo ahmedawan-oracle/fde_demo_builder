@@ -1,8 +1,20 @@
 {
  "max_hold": 5.0,
- "authored": ["scenes/film.html", "scenes/shots.js"],
- "required_phrases": ["fictional"],
- "banned_phrases": ["plain english", "generally available", "available now", "guaranteed", "100% accurate"],
+ "authored": [
+  "scenes/film.html",
+  "scenes/shots.js",
+  "scenes/captions.json"
+ ],
+ "required_phrases": [
+  "fictional"
+ ],
+ "banned_phrases": [
+  "plain english",
+  "generally available",
+  "available now",
+  "guaranteed",
+  "100% accurate"
+ ],
  "hygiene_patterns": {
   "email": "[\\w.+-]+@[\\w-]+\\.[a-z]{2,}",
   "OCI OCID": "ocid1\\.[a-z]+\\.oc1",
@@ -10,5 +22,42 @@
   "private host": "\\b[a-z0-9.-]+\\.(internal|corp|local)\\b",
   "customer names (add yours)": "\\b(ExampleCustomerA|ExampleCustomerB)\\b"
  },
- "claims": "claims.json"
+ "claims": "claims.json",
+ "seams": "seams.json",
+ "seam_edges": 1.0,
+ "brief": "BRIEF.md",
+ "design": "design.md",
+ "storyboard": "STORYBOARD.md",
+ "ledger": "media.jsonl",
+ "swatches": "swatches.json",
+ "overlay_safe_box": 0.8,
+ "overlay_action_box": 0.9,
+ "caption_max_words": 6,
+ "caption_max_chars_per_line": 42,
+ "hero_max_per_film": 2,
+ "zoom_max": 2.0,
+ "zoom_warn": 1.6,
+ "voice_over_bed_lu": 12,
+ "voice_over_bed_fail_lu": 9,
+ "lint_strict": false,
+ "contrast": "warning",
+ "canary": {
+  "enabled": true,
+  "max_times": 6
+ },
+ "snapshot": {
+  "golden": "golden",
+  "max_changed": 1.0,
+  "psnr": 40
+ },
+ "motion": {
+  "mask": [
+   [
+    0,
+    540,
+    1280,
+    180
+   ]
+  ]
+ }
 }

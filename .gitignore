@@ -21,3 +21,4 @@ conn.json
 .claude/
 .mcp.json
 *.ocid
+.research/
