@@ -1,8 +1,9 @@
-# Lint, determinism and the pre-render loop (v4)
+# Lint, determinism and the pre-render loop (v5)
 
 A v3 film is one HTML scene whose only input is the clock `t`. Everything the seek cannot drive — a CSS
-transition, `Date.now()`, a rAF outside the preview loop, `Math.random()`, state that advances per call —
-makes the three-worker render differ chunk to chunk and makes stills lie. Before `build_film.py` spends ten
+transition, `Date.now()`, a rAF outside the preview loop, `Math.random()`, state that advances per call, a
+`will-change` hint that lets the compositor pick a raster scale from history — makes the three-worker render
+differ chunk to chunk and makes stills lie. Before `build_film.py` spends ten
 minutes rendering, four cheap tools say whether it will be worth it.
 
 ```
@@ -13,7 +14,7 @@ python gates/canary.py scenes/film.html                  # 4  render-determinism
 python gates/snapshot.py scenes/film.html [--update]     # 5  golden frames per shot + diff sheet
 ```
 
-Rule of thumb from HyperFrames' troubleshooting guide, kept: on any failure run doctor → lint → check.
+Rule of thumb: on any failure run doctor → lint → check, in that order.
 
 ## 1  doctor.py — pre-flight
 
@@ -48,12 +49,15 @@ downgrades the seekability rules to info because b-roll scenes use transitions a
 | markup | `unbalanced_style_tags` / `unbalanced_script_tags` (E) · `visible_markup_comment` (E) · `unclosed_tag_swallowed_element` (E) · `self_closing_media_tag` (E) · `html_dir_attribute` (E) · `root_css_zoom` (E) · `js_syntax_error` (E, `node --check`) · `negative_z_index` · `id_starts_with_digit` · `stage_dimensions_mismatch` · `css_brace_balance` (W) | five-minute regex checks for the blank-frame bugs |
 | perf | `heavy_overlay_count` (W ≥ 25 blur/backdrop-filter/radial-gradient/clip-path) · `large_image_asset` (W > 3840×4320; seq frames > 1920×1080) | flatten decorative layers; source at most 2× delivery |
 | project | `missing_local_asset` (E) every CLIPS file on disk, bed/sfx, scripts · `shot_clip_unknown` (E) · `timing_total_mismatch` (E) | `extract_clips.py`, `gen_vo_multivoice.py` |
+| motion (v5) | `timeline_autoplay` (E) `gsap.to/from/set` on the global timeline, `gsap.ticker.add`, `repeat: -1`, `tl.play()/.resume()`, a rAF outside the preview branch · `third_party_library` (I) gsap / three / d3-delaunay loaded from `node_modules` by relative path are known and left unlinted (a relative `import()` of three is allowed; any `http(s)` import or `<script src>` stays `remote_ref`) · finishing on the footage lane (`GL.pass` / `GL.chain` / `VFX.*` aimed at `#clipWrap`, `#clipImg`, `lane.`) is an error · a `GL.cutTransition` over footage longer than 0.5 s is an error · `getContext('webgl')` outside `lib/shaders.js` and `lib/title3d.js` is an error (one GL owner) | drive every timeline through `MOTION.block`; `npm i gsap three d3-delaunay`; transitions over footage only inside a `type: gl` seam row |
+| | `will_change_layer` (E) `will-change:` in CSS or `.style.willChange =` in JS, in the scene or in `lib/*.js` (node_modules excluded) | delete it — a promoted layer rasters at a scale the compositor picks from its transform history, so a cold seek and a stepped run (or two renders under load) raster the glyphs differently (measured: glass panel 46/76 frames, title line 43 dB, annotate circle composited as `WillChangeTransform`); blur, backdrop-filter and canvases are composited anyway |
 
 Generic families (`serif`, `sans-serif`, `monospace`, `system-ui`, `ui-*`, `-apple-system`, …) and
 `inherit/initial/unset/revert` are never flagged; `var(--x)` tokens are skipped; Google Fonts `<link>` /
 `@import` families count as declared (and are themselves a `remote_ref`). Tall stitched pages are legitimate:
-`large_image_asset` warns, never blocks. `--selftest` lints a bundled bad/good pair (24 codes must fire; the
-good scene must be error-free; exactly four live non-deterministic calls, string and comment ignored).
+`large_image_asset` warns, never blocks. `--selftest` lints a bundled bad/good pair (every code in the pair's
+manifest must fire; the good scene must be error-free; exactly four live non-deterministic calls, string and
+comment ignored).
 
 ## 3  fonts_localize.py — rule out your machine as a variable
 
@@ -82,13 +86,31 @@ a handful of frames three ways (cold #1, cold #2, stepped from `t − 1 s`) and 
   PSNR ≥ 60 dB. Measured on the Acme sample: Chrome promotes a fading lower-third to its own compositor layer
   after a few stepped frames and moves **one** pixel by 21 levels (85.8 dB; 68.7 dB with `--disable-gpu`).
   A real seam (the per-call odometer in `--selftest`) sits near 32 dB with 0.13 % of pixels changed.
-- `--cross-machine` relaxes to PSNR ≥ 40 dB (HyperFrames' regression-harness floor). `RENDER_SOFTWARE_GPU=1`
-  adds `--disable-gpu` for both probe and (if you mirror it) render.
+- `--cross-machine` relaxes to PSNR ≥ 40 dB (below that a frame difference starts to be visible). The probe
+  runs on the same GL path as the render — software GL by default (`RENDER_GL=hardware` opts both out) — and
+  records the `gl_renderer` string; two renders must report the same one (the `determinism` gate). Software GL measured
+  2026-10-02: WebGL2 present, a DOM shot in 80 ms vs 157 ms through the GPU process, 120/120 frames identical
+  across three-worker renders; hardware vs software frames differ on every frame, so a film is rendered on one path.
+- Seek parity for GSAP / canvas scenes is judged on PNG hashes inside ONE page — step every frame, then jump to
+  the same frames in reverse and shuffled order — because `framemd5` of separately encoded x264 chunks differs by
+  codec noise (~53 dB) even when the DOM is identical. Measured on the Acme sample: 14 times visited in scrambled
+  order in one page (0.5 … 36.567, one inside the GL seam) equal the cold frames at every time.
+- **Every requested time snaps to the exact frame** — `snap(t) = round(t·fps)/fps`, handed to the probe at six
+  decimals. The cold probe seeks to that value and the stepped probe ends on it; they must be the same instant.
+  A 3-decimal snap (7.833 for frame 235 = 7.8333…) moved a gliding title by 0.33 ms and reported a 43 dB
+  "seek parity" failure on a scene whose two paths agree to the byte.
 - On a mismatch: `out/canary/diff_*.png` (|a−b| × 8) and the changed-pixel % with the first offending t.
 
-The probe pins Chrome's determinism flags: `--font-render-hinting=none --disable-lcd-text
---force-color-profile=srgb --disable-background-timer-throttling --disable-renderer-backgrounding`, waits for
-`document.fonts.ready`, awaits the decode Promise that `__seek/__step` return, forces layout before the shot.
+The probe mirrors `render_frames.js` exactly: Chrome's determinism flags (`--font-render-hinting=none
+--disable-lcd-text --force-color-profile=srgb --disable-background-timer-throttling
+--disable-renderer-backgrounding`) plus the software-GL and compositor-sync flags; every declared `@font-face`
+loaded explicitly after `document.fonts.ready` (`src: local()` faces settle up to ~1 s later); the cold frame
+re-seeked and captured until two consecutive captures are byte-identical (max 8 × 250 ms — a late glyph paint is
+a warm-up, not a seam); the decode Promise that `__seek/__step` return awaited; layout forced; then **two
+animation frames** before the shot so the compositor has committed and activated the last step. The canary
+samples 5–8 frames, so it is the smoke test; the proof is two full 3-worker renders of the film made while the
+machine is busy (or started together) with an empty `framemd5` diff — 0/1099 on the Acme sample
+(`deterministic-render.md`).
 
 ## 5  snapshot.py — golden frames per shot
 
@@ -116,7 +138,7 @@ made transparent, one screenshot, paint restored first, median background inside
 | `lint` | lint_scene | 0 errors on scene + lib/*.js + project assets | `lint_strict`, `lint_profile` |
 | `text layout` | lint_scene | no text issue held ≥ 2 samples, no page error | `audit_text: false` skips |
 | `contrast` | lint_scene | warning-only unless `"contrast": "error"` | `contrast` |
-| `determinism` | canary | cold #1 == cold #2 at every time | `canary: {times, max_times, approach, cross_machine, enabled}` |
+| `determinism` | canary | cold #1 == cold #2 at every time, same `gl_renderer` in both receipts | `canary: {times, max_times, approach, cross_machine, enabled}` |
 | `seek parity` | canary | cold == stepped (≥ 60 dB invisible) | same |
 | `golden` | snapshot | every shot within threshold of golden/ (info when no golden/) | `snapshot: {golden, max_changed, psnr}` |
 

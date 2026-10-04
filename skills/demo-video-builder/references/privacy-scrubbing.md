@@ -6,7 +6,10 @@
 
 Real screen recordings leak sensitive data everywhere. **Every shipped frame must be clean.** This is the
 single most common way a demo video goes out with something it shouldn't. Treat it as a hard gate, not a
-nicety.
+nicety. In v3+ films the gate is literal: `gates/leak_gate.py` OCRs every extracted frame for e-mails,
+identifiers, URLs, tokens, phone numbers, denylisted names (`BRIEF.md → ## Never on screen`) and account
+badges, and `tools/mask_propose.py` writes the soft-blur fix — `privacy-leak-gate.md`. Masks are small soft
+blurs, never white fills.
 
 ## The leak checklist (scan the whole recording for each)
 
@@ -62,5 +65,6 @@ After building, sample frames across the whole video and **look**:
 ffmpeg -v error -ss <t> -i out/demo.mp4 -frames:v 1 -q:v 3 out/qa/check_<t>.jpg
 ```
 Check the beginning, middle, and end of every beat, and any moment the UI scrolls or a field gets focus.
-The `demo-qa-reviewer` agent automates this sweep. Re-verify after every rebuild — masks are in native
-coordinates and a framing change can shift what's visible.
+The `demo-qa-reviewer` agent automates this sweep; for films, `python qa_film.py` runs the leak gate and
+`python gates/leak_gate.py --scan frame.png` checks any grab before you extract from it. Re-verify after every
+rebuild — masks are in native coordinates and a framing change can shift what's visible.

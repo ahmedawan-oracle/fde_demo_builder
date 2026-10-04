@@ -1,4 +1,4 @@
-# Captions and graphic overlays (v4)
+# Captions and graphic overlays (v5)
 
 Burned-in captions and overlays for the v3/v4 film: `lib/captions.js` (CAP), `lib/overlays.js` (OVL),
 `tools/captions_srt.py`, `gates/overlay_gate.py`, `templates/captions.example.json`. Everything is a pure
@@ -39,6 +39,8 @@ function of the narration clock `t`; nothing here grades the footage. Examples a
 | `conference` | persona lines: role 400 / line 700 card | 0.042·h, 700 on charcoal | pill .72 | 0.4 s swipe once, then static |
 | `typewriter` | the product's own voice | Consolas 0.040·h, 500 | 40 % gradient band | 33 chars/s, 600 ms cursor blink |
 | `clipwipe` | openers / chapter lines | 0.05·h, 300 → 700 on line 2 | shadow | per-word clip wipe 0.25 s |
+| `karaoke` (v5) | the hero question, a quoted answer (≤ 2 phases per film) | Segoe UI 0.045·h, 600 → 700 cross-fade, accent #E8C874 | shadow .65 | spoken word: attack 0.12 s, pulse 1.06, rest 0.82 / future 0.55 — no reflow |
+| `kinetic` (v5) | recreated lines, chapter cards | 0.05·h, 700, accent #E56B5E | shadow .6 | word waterfall 0.06 s × 0.84ⁱ ≤ 0.3 s, lead 0.3 s, block exit 0.18 s |
 
 Forbidden in this register (`CAP.FORBIDDEN`): highlight sweeps, neon, glitch, kinetic slams, particle
 bursts, emoji pops, gradient fills, matrix decodes. Fonts are local Windows/mac families only — never a
@@ -64,6 +66,8 @@ scenes/captions.json              copy of templates/captions.example.json — st
 node scenes/lib/captions.js scenes/timing_film_data.js scenes/captions.json \
      --out out/caption_groups.json --js scenes/captions_data.js [--luma out/caption_luma.json]
 python tools/captions_srt.py out/caption_groups.json out/<film>.srt --vtt out/<film>.vtt
+python tools/captions_ass.py out/caption_groups.json --out out/<film>.ass --srt out/<film>.srt --vtt out/<film>.vtt   # v5: + .ass with per-word tags
+python tools/chapters.py STORYBOARD.md --seams seams.json --phases vo/film_phases.json --out out               # v5: chapters on cuts
 python gates/overlay_gate.py --probe scenes/film.html        # per-phase lane luma -> out/caption_luma.json
 ```
 Run the export before `render_frames.js` (the scene loads `captions_data.js`) and the SRT step after it,
@@ -96,9 +100,13 @@ function frame(t) { …
   +0.10, accent tab scaleY 0.45 s at +0.28, line y22→0 0.5 s at +0.34, label at +0.44; exit y+18 + fade
   0.35 s power2-in. Cardless: line y28→0 0.55 s at +0.10, 6 px rule scaleX 0.5 s power4-out at +0.30, label
   y16→0 at +0.46; exit label 0.3 s, rule retracts 0.3 s, line lifts −16 px 0.32 s; text-shadow 0 2px 22px
-  rgba(0,0,0,.45). Rule: cardless over clean footage, charcoal `#16181d` card (radius 14) over bright or
-  busy footage — `variant:'auto'` decides from the probed luma. Give it ≥ 4.8 s so the exit plays. Labels are
-  roles ("THE ANALYST"), never names; quote the copy verbatim.
+  rgba(0,0,0,.45). Rule: cardless over clean footage, charcoal `#16181d` card over bright or busy footage —
+  `variant:'auto'` decides from the probed luma. Cards follow the design tokens: radius ≤ 4, no drop shadow, and
+  no accent stripe unless asked (`tab:false` is the house default — the sample's craft review found the 12 px
+  stripe, 14 px radius and shadow all banned by `design.md`); the line starts with the wipe so the plate is
+  never empty. Label ≥ 16 stage px. Give it ≥ 4.8 s so the exit plays, or 2 s for a short hand-off when one voice
+  must own the hero line (the sample's ask beat). Labels are roles ("THE ANALYST"), never names; quote the copy
+  verbatim.
 - **Callout / stat card** `OVL.callout(host, t, {id, t0, dur, zone:'lower-right'|'lower-left'|'side-panel'|'glass', kicker, value:{from,to,dec,prefix,suffix}, detail, style:'swiss'|'minimal'|'terminal'|'glass'})`.
   Card fade 0.4 s power2-out + y12; kicker +0.05 (16 px 600 uppercase tracking 0.28 em); odometer
   `G.odo(from,to,t,t0+0.3,0.7,dec)` at 60 px 800; rule grow-x 0.5 s power3-out at +0.65; detail 26 px at

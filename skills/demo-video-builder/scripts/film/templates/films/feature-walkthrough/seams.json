@@ -1,0 +1,85 @@
+{
+ "_doc": [
+  "seams.json for the feature-walkthrough template — the vector ledger: one row per CUT (seam:true hand-offs stay out).",
+  "Kinds allowed in this template: cut-the-curve (the current, leftward) on ordinary cuts; zoom-through (z+1) INTO each feature's",
+  "screen — one reserved vector per act, which is what the doctrine permits; rack-focus once, into the recap. No gl rows, no",
+  "inverse zoom-through, no waterfall. Each feature cut carries cause chapter so tools/chapters.py snaps the chapter to it and",
+  "audio/sfx_place.py may give the act its one impact.",
+  "cut = seconds or a cue expression: P.<phase>, P.<phase>_end, wt(<phase>,<word>[,n]), arithmetic. Phases match STORYBOARD.md.",
+  "Fictional Acme sample; layer ids follow film.example.html (#hookCard, #titleCard, #camera, #camera-in, #r1Card, #r2Card, #recapCards, #closeCard)."
+ ],
+ "template": "feature-walkthrough",
+ "current": "x-1",
+ "fps": 30,
+ "stage": [1280, 720],
+ "allowed": ["cut-the-curve", "zoom-through", "rack-focus"],
+ "seams": [
+  {
+   "id": "hook->title",
+   "cut": "P.title",
+   "technique": "cut-the-curve",
+   "act": "open",
+   "exit": {"selector": "#hookCard", "axis": "x", "dir": -1},
+   "entry": {"selector": "#titleCard", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "title->f1",
+   "cut": "P.f1",
+   "technique": "zoom-through",
+   "cause": "chapter",
+   "act": "feature-one",
+   "exit": {"selector": "#titleCard", "axis": "z", "dir": 1},
+   "entry": {"selector": "#camera", "axis": "z", "dir": 1}
+  },
+  {
+   "id": "f1->r1",
+   "cut": "P.r1",
+   "technique": "cut-the-curve",
+   "act": "feature-one",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#r1Card", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "r1->f2",
+   "cut": "P.f2",
+   "technique": "zoom-through",
+   "cause": "chapter",
+   "act": "feature-two",
+   "exit": {"selector": "#r1Card", "axis": "z", "dir": 1},
+   "entry": {"selector": "#camera", "axis": "z", "dir": 1}
+  },
+  {
+   "id": "f2->r2",
+   "cut": "P.r2",
+   "technique": "cut-the-curve",
+   "act": "feature-two",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#r2Card", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "r2->f3",
+   "cut": "P.f3",
+   "technique": "zoom-through",
+   "cause": "chapter",
+   "act": "feature-three",
+   "exit": {"selector": "#r2Card", "axis": "z", "dir": 1},
+   "entry": {"selector": "#camera", "axis": "z", "dir": 1}
+  },
+  {
+   "id": "f3->recap",
+   "cut": "P.recap",
+   "technique": "rack-focus",
+   "act": "recap",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#recapCards", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "recap->close",
+   "cut": "P.close",
+   "technique": "cut-the-curve",
+   "act": "close",
+   "exit": {"selector": "#recapCards", "axis": "x", "dir": -1},
+   "entry": {"selector": "#closeCard", "axis": "x", "dir": -1}
+  }
+ ]
+}

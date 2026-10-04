@@ -1,0 +1,76 @@
+{
+ "_doc": [
+  "seams.json for the customer-story template — the vector ledger: one row per CUT (seam:true hand-offs stay out).",
+  "Kinds allowed in this template: cut-the-curve (the current, leftward) on every ordinary cut and ONE inverse zoom-through (z-1,",
+  "arrival) into the 'team today' beat. No gl rows, no zoom-through, no rack-focus, no waterfall: a story is read, not punched.",
+  "cut = seconds or a cue expression: P.<phase>, P.<phase>_end, wt(<phase>,<word>[,n]), arithmetic. Phases match STORYBOARD.md.",
+  "The ask -> answer hand-off (beat 05 -> 06) is seamless footage (shots.js `seam: true`) and is therefore NOT a row here.",
+  "Fictional Acme sample; layer ids follow film.example.html (#titleCard, #camera, #camera-in, #turnCard, #changeCard, #closeCard)."
+ ],
+ "template": "customer-story",
+ "current": "x-1",
+ "fps": 30,
+ "stage": [1280, 720],
+ "allowed": ["cut-the-curve", "inverse zoom-through"],
+ "seams": [
+  {
+   "id": "open->before",
+   "cut": "P.before",
+   "technique": "cut-the-curve",
+   "act": "customer",
+   "exit": {"selector": "#titleCard", "axis": "x", "dir": -1},
+   "entry": {"selector": "#camera", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "before->turn",
+   "cut": "P.turn",
+   "technique": "cut-the-curve",
+   "act": "turn",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#turnCard", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "turn->work",
+   "cut": "P.work",
+   "technique": "cut-the-curve",
+   "cause": "chapter",
+   "act": "work",
+   "exit": {"selector": "#turnCard", "axis": "x", "dir": -1},
+   "entry": {"selector": "#camera", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "work->ask",
+   "cut": "P.ask",
+   "technique": "cut-the-curve",
+   "cause": "chapter",
+   "act": "question",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#camera-in", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "answer->change",
+   "cut": "P.change",
+   "technique": "cut-the-curve",
+   "cause": "chapter",
+   "act": "change",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#changeCard", "axis": "x", "dir": -1}
+  },
+  {
+   "id": "change->today",
+   "cut": "P.today",
+   "technique": "inverse zoom-through",
+   "act": "today",
+   "exit": {"selector": "#changeCard", "axis": "z", "dir": -1},
+   "entry": {"selector": "#camera", "axis": "z", "dir": -1}
+  },
+  {
+   "id": "today->close",
+   "cut": "P.close",
+   "technique": "cut-the-curve",
+   "act": "close",
+   "exit": {"selector": "#camera", "axis": "x", "dir": -1},
+   "entry": {"selector": "#closeCard", "axis": "x", "dir": -1}
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "_doc": [
+  "skin.json for the feature-walkthrough template: a POINTER, not a skin. new-film writes `skin` into film.json \"skin\"; build_film.py",
+  "then runs tools/skin_apply.py (scenes/skin_data.js + design.md tokens) before the lint and the render.",
+  "Meridian Dark: charcoal ground, electric-teal accent, medium motion profile, broadcast captions - developer and platform demos.",
+  "Mint Ledger is the light alternative (typewriter captions, calm) for ledger/audit features read in a bright room."
+ ],
+ "template": "feature-walkthrough",
+ "skin": "skins/meridian-dark.json",
+ "alternatives": {
+  "light": "skins/mint-ledger.json",
+  "corporate": "skins/slate.json"
+ },
+ "head_fade": "the scene's #black plate reads var(--black) from the skin: dark skins open from near-black, light skins from their own paper"
+}

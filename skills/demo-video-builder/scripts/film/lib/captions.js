@@ -20,7 +20,16 @@
    max-width 80 %, fade 0.12 s up / 0.15 s down (exits ≈ 60–75 % of entrances), one family + two weights,
    ≤ 6 words / 2.5 s / 42 chars per line / 2 lines, ≥ 0.5 s on screen, group.in = first − 0.08,
    group.out = min(next.in − 0.05, last.end + 0.6). Active-word envelope: attack 0.12 s, release 0.3 s,
-   rest 0.55, scale ≤ 1.04 (rail allows ≤ 1.1). Doctrine: references/captions-and-overlays.md. */
+   rest 0.55, scale ≤ 1.04 (rail allows ≤ 1.1). Doctrine: references/captions-and-overlays.md.
+
+   v5 word-level styles (references/karaoke-kinetic-captions.md):
+     karaoke   the spoken word lights up on its own word time: colour → accent over 0.12 s, weight 600 → 700 by
+               cross-fading a second, bold layer (the bold layer is in-flow at opacity 0, so the word's box is
+               already the bold width and nothing reflows), a 1.06 scale pulse that peaks at 0.06 s and is back
+               at 1.0 by 0.12 s; past words settle to ink at 0.82 opacity over 0.3 s, future words wait at 0.55.
+     kinetic   each caption line arrives as a word waterfall (word i enters at Σ 0.06·0.84^j, cumulative delay
+               capped at 0.3 s, each word 0.25 s rise 10 px + fade) and the whole caption leaves as one block.
+   Both keep every lane rule: wrap honours maxChars, one group at a time, lane position, data-ov="cap". */
 (function (root) {
   'use strict';
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -64,7 +73,7 @@
                    tracking: '-0.045em', maxWords: 5, maxChars: 22, lines: 2, enter: { dur: 0.40, dy: 0, wipe: 'x' }, exit: { dur: 0.30, dy: 0 }, perWord: false,
                    env: { attack: 0, release: 0, rest: 1, scale: 0 }, fate: 'embed' },
     ink:         { use: 'near-black type for bright product screens (lane luma > 150); letterpress stillness, no float', font: SANS, weightBody: 600, weightEm: 700, sizeH: 0.045, bottomPx: 112,
-                   ink: '#111418', dimInk: 'rgba(17,20,24,.55)', accent: '#B23A2E', scrim: { kind: 'pill', alpha: 0.55, light: true }, align: 'center', case: 'none',
+                   ink: '#111418', dimInk: 'rgba(17,20,24,.55)', accent: '#B23A2E', scrim: { kind: 'pill', alpha: 0.92, light: true }, align: 'center', case: 'none',   // .92: a near-transparent plate over code/prose is text-on-text; the pill is glyph-local so the page stays visible around the words
                    tracking: '0.008em', maxWords: 6, maxChars: 42, lines: 2, enter: { dur: 0.12, dy: 0 }, exit: { dur: 0.12, dy: 0 }, perWord: true,
                    env: { attack: 0.12, release: 0.3, rest: 0.55, scale: 0 }, fate: 'rail' },
     conference:  { use: 'persona lines: dual-weight card (role 400 / line 700), swipe-in once then static, inline active word', font: SANS, weightBody: 700, weightEm: 700, sizeH: 0.042, bottomPx: 116,
@@ -78,7 +87,15 @@
     clipwipe:    { use: 'clean per-word clip-path wipe; weight 300 → 700 between line 1 and line 2 — openers, chapter lines', font: SANS, weightBody: 300, weightEm: 700, sizeH: 0.05, bottomPx: 112,
                    ink: '#FFFFFF', dimInk: '#FFFFFF', accent: '#FFFFFF', scrim: { kind: 'shadow', alpha: 0.6 }, align: 'center', case: 'none',
                    tracking: '-0.01em', maxWords: 6, maxChars: 36, lines: 2, enter: { dur: 0.25, dy: 0, wipe: 'word' }, exit: { dur: 0.18, dy: 0 }, perWord: false,
-                   env: { attack: 0, release: 0, rest: 1, scale: 0 }, weightLine2: 700, fate: 'rail' }
+                   env: { attack: 0, release: 0, rest: 1, scale: 0 }, weightLine2: 700, fate: 'rail' },
+    karaoke:     { use: 'the spoken word lights up on its word time: accent colour, +100 weight via a bold overlay, 1.06 pulse; past 0.82, future 0.55', font: SANS, weightBody: 600, weightEm: 700, sizeH: 0.045, bottomPx: 112,
+                   ink: '#E9F3F9', dimInk: 'rgba(233,243,249,.55)', accent: '#E8C874', scrim: { kind: 'shadow', alpha: 0.65 }, align: 'center', case: 'none',
+                   tracking: '0.012em', maxWords: 6, maxChars: 42, lines: 2, enter: { dur: 0.12, dy: 4 }, exit: { dur: 0.15, dy: 6 }, perWord: true,
+                   env: { attack: 0.12, release: 0.3, rest: 0.82, future: 0.55, scale: 0.06, pulse: 0.12 }, karaoke: true, fate: 'rail' },
+    kinetic:     { use: 'word waterfall in (0.06 s × 0.84^i, cumulative ≤ 0.3 s, 0.25 s rise each), block out — chapter lines, recreated beats', font: SANS, weightBody: 700, weightEm: 700, sizeH: 0.05, bottomPx: 112,
+                   ink: '#E9F3F9', dimInk: '#E9F3F9', accent: '#E56B5E', scrim: { kind: 'shadow', alpha: 0.6 }, align: 'center', case: 'none',
+                   tracking: '-0.01em', maxWords: 6, maxChars: 36, lines: 2, enter: { dur: 0.25, dy: 10, waterfall: { gap0: 0.06, decay: 0.84, cap: 0.3 } }, exit: { dur: 0.18, dy: 8 }, perWord: false,
+                   env: { attack: 0, release: 0, rest: 1, scale: 0 }, lead: 0.3, fate: 'rail' }
   };
   /* never on a booth film (register): highlight sweeps, neon, glitch, slam, emoji pops, gradient fills */
   const FORBIDDEN = ['highlight-sweep', 'neon', 'glitch', 'kinetic-slam', 'particle-burst', 'emoji-pop', 'gradient-fill', 'matrix-decode'];
@@ -86,7 +103,7 @@
   /* ------------------------------------------------------------------ text measurement ----
      Browser: canvas measureText (memoised; local fonts → stable). Node / fallback: chars × em-advance
      (measured on Windows: Segoe UI ≈ 0.45–0.48 em per char incl. spaces, Consolas 0.55; uppercase ×1.2 for
-     proportional faces; HyperFrames' generic 0.56 kept as the unknown-family default). Default wrap mode is
+     proportional faces; 0.56 em is the unknown-family default). Default wrap mode is
      'estimate' so node (SRT) and browser (burn-in) break lines identically; the QA gate re-measures with the
      real TTF and fails any line wider than 92 % of the box. */
   const EM = [[/segoe/i, 0.47], [/arial|helvetica/i, 0.47], [/consolas|courier|mono/i, 0.55], [/georgia|serif/i, 0.46]];
@@ -216,15 +233,16 @@
       groups.forEach(g => out.push({ phase: ph.name, fate: fate, style: style, words: g }));
     }
     // windows: in = first − lead (never before the previous out + 0.02), out = min(next.in − 0.05, last.end + tail), ≥ last.end
+    const leadOf = g => { const tk = STYLES[g.style] || STYLES.anchor; return tk.lead !== undefined ? tk.lead : o.lead; };   // kinetic needs its waterfall in the air before the first word
     out.forEach((g, i) => {
       const first = g.words[0], last = g.words[g.words.length - 1], tok = STYLES[g.style] || STYLES.anchor;
       g.id = 'cg-' + i;
-      g.in = r3(Math.max(first.start - o.lead, i ? out[i - 1].out + 0.02 : 0, 0));
+      g.in = r3(Math.max(first.start - leadOf(g), i ? out[i - 1].out + 0.02 : 0, 0));
       if (g.in > first.start) g.in = r3(first.start);
       const nxt = out[i + 1];
       const tail = tok.tail !== undefined ? tok.tail : o.tail;
       let end = last.end + tail;
-      if (nxt) end = Math.min(end, nxt.words[0].start - o.lead - 0.05);
+      if (nxt) end = Math.min(end, nxt.words[0].start - leadOf(nxt) - 0.05);
       g.out = r3(Math.max(end, last.end + 0.02));
       if (g.out - g.in < o.minDur) g.out = r3(g.in + o.minDur);
       if (nxt && g.out > nxt.words[0].start - 0.03) g.out = r3(Math.max(last.end + 0.02, nxt.words[0].start - 0.03));
@@ -252,6 +270,32 @@
     if (t < end) return o.attack > 0 ? Math.min((t - start) / o.attack, 1) : 1;
     if (o.release > 0 && t < end + o.release) return 1 - ((t - end) / o.release) * (1 - o.rest);
     return o.rest;
+  }
+  /* ------------------------------------------------------------------ karaoke word state ----
+     A word has three ages. Future: waits at `future` opacity (0.55), ink, regular weight. Spoken: over `attack`
+     (0.12 s) its opacity climbs to 1, its colour slides to the accent and the bold layer cross-fades in; a scale
+     pulse sin(π·u) over `pulse` (0.12 s) peaks at 1 + scale (1.06) after 0.06 s and is exactly 1.0 again when the
+     pulse ends. Past: over `release` (0.3 s) the accent and the bold layer fade back out and the opacity settles
+     at `rest` (0.82). Pure function of t; the release starts from whatever level the attack reached, so a word
+     shorter than the attack never jumps. Returns { op: word opacity, u: how lit (0..1), sc: scale }. */
+  function karaoke(t, w, o) {
+    o = Object.assign({ attack: 0.12, release: 0.3, rest: 0.82, future: 0.55, scale: 0.06, pulse: 0.12 }, o || {});
+    const a = o.attack, r = o.release, span = Math.max(w.end - w.start, 0.001);
+    const uEnd = a > 0 ? Math.min(span / a, 1) : 1;
+    let op, u;
+    if (t < w.start) { op = o.future; u = 0; }
+    else if (t < w.end) { u = a > 0 ? Math.min((t - w.start) / a, 1) : 1; op = lerp(o.future, 1, u); }
+    else { const v = r > 0 ? clamp((t - w.end) / r, 0, 1) : 1; u = uEnd * (1 - v); op = lerp(lerp(o.future, 1, uEnd), o.rest, v); }
+    const pu = o.pulse > 0 ? clamp((t - w.start) / o.pulse, 0, 1) : 1;
+    const sc = 1 + (o.scale || 0) * Math.sin(Math.PI * pu);
+    return { op: op, u: u, sc: sc < 1.0005 ? 1 : sc };
+  }
+  /* waterfall delay of word i: Σ_{j<i} gap0·decay^j, capped (0, 0.06, 0.110, 0.153, 0.188, 0.218, 0.243, 0.264 … ≤ 0.3) */
+  function waterfallDelay(i, o) {
+    o = Object.assign({ gap0: 0.06, decay: 0.84, cap: 0.3 }, o || {});
+    let acc = 0, gap = o.gap0;
+    for (let j = 0; j < i; j++) { acc += gap; gap *= o.decay; }
+    return Math.min(acc, o.cap);
   }
   function mix(dim, bright, u) {                   // colour lerp between two css colours (#rgb/#rrggbb/rgba())
     const P = c => { let m;
@@ -291,7 +335,7 @@
       for (const x of groups) { if (t >= x.in && t < x.out) { g = x; break; } if (x.in > t) break; }
       if (!g || g.fate === 'drop') return { group: null, opacity: 0 };
       const tok = inkFor(g), first = g.words[0], last = g.words[g.words.length - 1];
-      const fi = Math.min(tok.enter.dur, Math.max(0, first.start - g.in));         // never fade during speech:
+      const fi = tok.enter.waterfall ? 0 : Math.min(tok.enter.dur, Math.max(0, first.start - g.in));   // never fade during speech (a waterfall enters word by word, the box itself is simply there):
       const fo = Math.min(tok.exit.dur, Math.max(0, g.out - last.end));             // clamp fades to the air around the words
       const uIn = fi > 0 ? EO2(rmp(t, g.in, g.in + fi)) : 1, uOut = fo > 0 ? EI2(rmp(t, g.out - fo, g.out)) : 0;
       let opacity = Math.min(uIn, 1 - uOut), dim = 1, hidden = false;
@@ -326,19 +370,31 @@
       else { b.style.left = '50%'; b.style.bottom = Math.round(tok.bottomPx * K) + 'px'; b.style.textAlign = 'center'; }
       // glyph-local legibility: shadow | pill | gradient | none (never a frame-wide bar)
       const sc = tok.scrim; b.style.textShadow = 'none'; b.style.background = 'none'; b.style.padding = '0'; b.style.borderRadius = '0';
+      b.style.borderRight = '';   // the typewriter caret is a border on this box: a group rebuilt after a cold seek has none, a stepped run inherited 2 px (box wider, centred text 1 px off) — reset on every rebuild
       if (sc.kind === 'shadow') b.style.textShadow = '0 ' + (3 * K).toFixed(1) + 'px ' + (14 * K).toFixed(1) + 'px rgba(0,0,0,' + sc.alpha + ')';
       if (sc.kind === 'pill') { b.style.background = sc.light ? 'rgba(255,255,255,' + sc.alpha + ')' : sc.dark ? 'rgba(22,24,29,' + sc.alpha + ')' : 'rgba(0,0,0,' + sc.alpha + ')';
         b.style.padding = '0.4em 0.7em'; b.style.borderRadius = '0.3em'; }
       if (sc.kind === 'gradient') { b.style.background = 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,' + sc.alpha + ') 55%, rgba(0,0,0,' + sc.alpha + ') 100%)';
         b.style.padding = '0.5em 1.2em 0.45em'; b.style.borderRadius = '0.2em'; }
       // per-word spans (inline-block so transform works without reflow; weight is set once, never animated)
+      // karaoke: two layers per word — the bold layer is IN FLOW at opacity 0 (it reserves the bold width, so the
+      // word never reflows when it lights), the regular layer sits absolutely centred on top; draw() cross-fades them.
+      b.setAttribute('data-cap-style', g.style);
       let k = 0;
       b.innerHTML = g.lines.map((line, li) => {
         const n = line.split(' ').length, ws = g.words.slice(k, k + n); k += n;
         return '<span class="cap-line" style="display:block;' + (tok.weightLine2 && li === 1 ? 'font-weight:' + tok.weightLine2 : '') + '">' +
-          ws.map(w => '<span class="cap-w" data-i="' + w.i + '" style="display:inline-block;line-height:1;transform-origin:50% 70%;' +
-            (w.em ? 'font-weight:' + (w.weight || tok.weightEm) + ';color:' + esc(w.color || tok.accent) + ';' : '') + '">' +
-            esc(tok.case === 'upper' ? w.display.toUpperCase() : w.display) + '</span>').join(' ') + '</span>';
+          ws.map(w => {
+            const txt = esc(tok.case === 'upper' ? w.display.toUpperCase() : w.display);
+            if (tok.karaoke) {
+              return '<span class="cap-w" data-i="' + w.i + '" style="display:inline-block;position:relative;line-height:1;transform-origin:50% 70%;' +
+                (w.em ? 'color:' + esc(w.color || tok.accent) + ';' : '') + '">' +
+                '<span class="cap-kb" style="display:inline-block;font-weight:' + (w.weight || tok.weightEm) + ';opacity:0">' + txt + '</span>' +
+                '<span class="cap-kr" style="position:absolute;left:0;right:0;top:0;text-align:center;font-weight:' + tok.weightBody + '">' + txt + '</span></span>';
+            }
+            return '<span class="cap-w" data-i="' + w.i + '" style="display:inline-block;line-height:1;transform-origin:50% 70%;' +
+              (w.em ? 'font-weight:' + (w.weight || tok.weightEm) + ';color:' + esc(w.color || tok.accent) + ';' : '') + '">' + txt + '</span>';
+          }).join(' ') + '</span>';
       }).join('');
       return b;
     }
@@ -380,6 +436,19 @@
           const u = EO3(rmp(t, w.start - 0.05, w.start - 0.05 + tok.enter.dur));
           sp.style.clipPath = 'inset(0 ' + ((1 - u) * 100).toFixed(2) + '% 0 0)'; sp.style.opacity = u > 0 ? '1' : '0'; return;
         }
+        if (tok.enter.waterfall) {                                                   // kinetic: word j arrives at in + Σ gap, rises dy and fades up over enter.dur
+          const d = waterfallDelay(j, tok.enter.waterfall), u = EO3(rmp(t, g.in + d, g.in + d + tok.enter.dur));
+          sp.style.opacity = u.toFixed(3);
+          sp.style.transform = u < 0.9995 ? 'translateY(' + ((1 - u) * tok.enter.dy * K).toFixed(2) + 'px)' : 'none'; return;
+        }
+        if (tok.karaoke) {                                                           // the spoken word lights up: opacity, accent, bold cross-fade, pulse
+          const ks = karaoke(t, w, tok.env), kb = sp.firstElementChild, kr = sp.lastElementChild;
+          sp.style.opacity = ks.op.toFixed(3);
+          if (!w.em) sp.style.color = mix(tok.ink, tok.accent, ks.u);
+          if (kb) kb.style.opacity = ks.u.toFixed(3);
+          if (kr) kr.style.opacity = (1 - ks.u).toFixed(3);
+          sp.style.transform = ks.sc > 1 ? 'scale(' + Math.min(ks.sc, 1.10).toFixed(4) + ')' : 'none'; return;
+        }
         if (!tok.perWord) { sp.style.transform = 'none'; return; }
         const e = env(t, w.start, w.end, tok.env);
         if (!w.em) sp.style.color = mix(tok.dimInk, tok.ink, e);
@@ -401,7 +470,7 @@
     return lane;
   }
 
-  const CAP = { STYLES, FORBIDDEN, GROUP_DEFAULTS, group, build, env, wrap, fitText, measure, estimate, mix, norm, EO2, EO3, EI2, EXPO, _wordsOf: wordsOf };
+  const CAP = { STYLES, FORBIDDEN, GROUP_DEFAULTS, group, build, env, karaoke, waterfallDelay, wrap, fitText, measure, estimate, mix, norm, EO2, EO3, EI2, EXPO, _wordsOf: wordsOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = CAP;
   if (typeof window !== 'undefined') root.CAP = CAP;
 

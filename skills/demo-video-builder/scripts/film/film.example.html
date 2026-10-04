@@ -1,17 +1,29 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>v4 film template — recreated cards around real footage</title>
+<html><head><meta charset="utf-8"><title>v5 film template — recreated cards around real footage</title>
 <!--
-  film.example.html — the v4 film template. One pure frame(t) on the narration clock:
-    0 … FILM.openEnd     recreated title card (word-keyed) on a seeded-grain, vignetted ground
-    FILM.openEnd …       real footage (lib/footage.js): each beat opens on the ORIGINAL full screen, then zooms
-    FILM.close … END     recreated closing card
-  Layers on top, in screen space (never inside #camera): lower thirds (lib/overlays.js), the caption lane
-  (lib/captions.js, groups computed from the narration's word times), the head fade.
-  Cuts are SEAMS: seams.json declares each one; lib/seams.js moves the outgoing and incoming layers so the
-  eye's momentum survives the cut; gates/seam_gate.py measures it on the rendered film.
-  Rendered deterministically by render_frames.js (?render, __seek/__step). The mandatory FDE Demo Builder credit
-  is NOT drawn here — build_film.py stamps it on the final video (credit.py), so no scene can drop it.
-  Everything shown in this example is fictional (Acme, synthetic data). Colours are skin tokens (:root vars).
+  film.example.html — the v5 film template. One pure frame(t) on the narration clock; every moving thing is a GSAP
+  timeline mounted through lib/motion.js and set from t (MOTION.seek), so the same t paints the same pixels in any
+  worker, on any machine, under software GL.
+    0 … P.title          hook card: a recreated chat (BL2.chatReveal) — the old way, a day for an answer
+    P.title … dive.at    title card: TYPO.centerBuild + heroWord, LIGHT.bloom behind the line, DEPTH.planes drifting
+    dive.at … dive.end   REVEAL.heroDive: the notebook's first still flies onto the staged window (lib/stage.js)
+    dive.end … P.ask     real footage, staged (window bezel, mesh wallpaper): the notebook scrolls for real; a 'page'
+                         GLASS.panel on blank page beside the boxed output row carries BL2.countUp, which lands the
+                         claims.json value directly (mode 'land') on the spoken number
+    P.ask … close        real footage, the whole screen for the typing then a ×1.15 push onto the chat column: the typed
+                         question is its own caption (ANNOTATE.spotlight frames the composer and glides to Send, CURSOR
+                         redraws the presenter's hand from events.jsonl), the real send, the answer card (ANNOTATE.circle
+                         on its figure, BL2.receipt under the card), then the one GL accent (lightLeak, 0.4 s, split 0.15,
+                         accent + ground colours: <= 2 frames of visible streak on the footage side) into
+    close … END + TAIL   the closing card: TYPO.lockup (kicker on its own spoken words) — then it HOLDS while
+                         build_film.py's credit lands (TAIL 3.6 s)
+  Cuts are SEAMS (seams.json): cut-the-curve rows move the cards and the camera; the match-cut row hands the title
+  card to the plate; the gl row is drawn by GL.cutTransition from SEAM.glSeams() (footage -> card, <= 0.5 s).
+  Real footage is sacred: nothing recolours, warps or grains the lane; marks, glass, light and the cursor live in
+  screen-space layers (or beside the lane inside #camera). Fonts and gsap/three/d3 load from local paths only
+  (npm i puppeteer gsap three d3-delaunay in the project). The mandatory FDE Demo Builder credit is NOT drawn here —
+  build_film.py stamps it on the final video (credit.py), so no scene can drop it.
+  Everything shown is fictional (Acme, synthetic data). Colours are skin tokens (:root vars; skin_data.js re-skins).
 -->
 <style>
 @font-face{font-family:'Georgia';src:local('Georgia')}
@@ -22,32 +34,49 @@
 html,body{margin:0;background:var(--paper);overflow:hidden;width:1280px;height:720px;font-family:var(--body-font);-webkit-font-smoothing:antialiased}
 body.pre #stage{visibility:hidden}
 #stage{position:absolute;inset:0;overflow:hidden;background:linear-gradient(180deg,var(--paper),var(--paper2))}
-#camera{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
+#camera{position:absolute;inset:0;transform-origin:0 0}
 #clipWrap{position:absolute;inset:0;overflow:hidden;background:#fff;opacity:0}
 #clipImg{position:absolute;left:0;top:0;width:1280px;height:720px;display:block}
 #pageView{position:absolute;overflow:hidden;display:none}
-#pageDoc{position:absolute;left:0;top:0;will-change:transform}
+#pageDoc{position:absolute;left:0;top:0}
 #pageImg{position:absolute;left:0;top:0;display:block}
 .hl{position:absolute;pointer-events:none;opacity:0}
 .hl.box{border:2px solid var(--accent);background:rgba(229,107,94,.08);border-radius:4px}
 .hl.row{background:rgba(229,107,94,.12);border-left:3px solid var(--accent)}
-.hl.tag{background:var(--paper);color:var(--ink);font:600 13px/1 var(--body-font);padding:7px 10px;border-radius:4px;border-left:3px solid var(--accent);white-space:nowrap}
+.hl.tag{background:var(--paper);color:var(--ink);font:600 16px/1 var(--body-font);padding:7px 10px;border-radius:4px;border-left:3px solid var(--accent);white-space:nowrap}   /* 16 px: the one legibility floor for every label (design.md scale.label_min) */
 .rv-plate{position:absolute}.rv-caret{position:absolute;width:2px}
 .curtain{position:absolute;left:0;width:100%}
 /* cards are opaque plates: a seam moves the whole surface, which the eye (and the seam gate) can follow */
-.card{position:absolute;inset:0;z-index:6;color:var(--ink);opacity:0;background:linear-gradient(180deg,var(--paper),var(--paper2))}
-#grainL{position:absolute;inset:0;mix-blend-mode:soft-light;pointer-events:none;z-index:7}
+.card{position:absolute;inset:0;z-index:6;color:var(--ink);background:linear-gradient(180deg,var(--paper),var(--paper2))}
 #vig{position:absolute;inset:0;pointer-events:none;z-index:8}
 .card .inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;transform-origin:50% 50%}
-.card h1{font:400 var(--title-size)/1.1 var(--title-font);margin:0;letter-spacing:-.01em}
+.card h1{font:400 var(--title-size)/1.1 var(--title-font);margin:0;letter-spacing:-.01em;position:relative}
 .card h2{font:400 22px/1.4 var(--body-font);margin:18px 0 0;color:var(--ink-soft)}
-.card .cap{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);white-space:nowrap;text-align:center;font:500 14px/1 var(--body-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}   /* outside the pushed .inner: stays inside title-safe */
+.card .cap{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);white-space:nowrap;text-align:center;font:500 16px/1 var(--body-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}   /* outside the pushed .inner: stays inside title-safe; 16 px floor */
 .card .rule{width:90px;height:3px;background:var(--accent);margin:26px 0 0}
-.close p{font:400 44px/1.25 var(--title-font);margin:0}
-.close p:first-child{color:var(--gold)}
+.kicker{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font:500 16px/1 var(--body-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#hKick{top:132px}
+#chatHost{position:absolute;left:360px;top:190px;width:560px}
+#hLabel{position:absolute;right:360px;top:166px;font:500 16px/1 var(--body-font);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);opacity:.8}   /* the card's own tag, just above its top-right corner: the card grows on the send, so nothing hangs under it */
+/* depth planes behind the title: soft recreated shapes, one near occluder (blur radii fixed at build, lib/depth.js).
+   Two hues only: the far disc and the ring are the muted mint, the near plane the accent at atmosphere opacity — and it
+   crosses UNDER the headline box (top 520), never through the words (a blurred coral plane drifting behind "Monday," read
+   as a smear) */
+#tPlanes{position:absolute;inset:0;overflow:hidden}
+.pl{position:absolute;border-radius:50%}
+#plFar{left:120px;top:80px;width:520px;height:520px;background:radial-gradient(circle at 50% 50%,rgba(129,169,171,.22),rgba(129,169,171,0) 70%)}
+#plMid{left:800px;top:300px;width:300px;height:300px;border:2px solid rgba(129,169,171,.35)}   /* 2 px: a 1 px border vanishes on video */
+#plNear{left:-40px;top:520px;width:560px;height:190px;border-radius:95px;background:rgba(229,107,94,.14)}
+#closeInner{inset:0 0 0 0}
+/* the receipt pill restates the answer card's figure, so it sits just under the card on blank page — never on the product's
+   own breadcrumb / greeting band (answer card: source 520,400 880x170 → stage 347,267 587x113) */
+#rcHost{position:absolute;left:347px;top:398px}
+#glx{position:absolute;left:0;top:0;width:1280px;height:720px;z-index:30;pointer-events:none}
 #ovl,#cap{position:absolute;inset:0;z-index:40;pointer-events:none}
 #black{position:absolute;inset:0;background:var(--black);opacity:0;z-index:70}
-</style></head>
+</style>
+<script src="skin_data.js"></script>
+</head>
 <body>
 <div id="stage">
   <div id="camera">
@@ -58,24 +87,41 @@ body.pre #stage{visibility:hidden}
         <div id="pageCurtain" class="curtain" style="display:none"></div></div></div>
     </div>
   </div>
-  <canvas id="grainL" width="1280" height="720"></canvas>
-  <div id="vig"></div>
-  <div class="card" id="titleCard"><div class="inner" id="titleInner"><h1 id="tTitle"></h1><div class="rule" id="tRule"></div><h2 id="tSub"></h2></div><div class="cap" id="tCap"></div></div>
+  <div class="card" id="hookCard"><div class="kicker" id="hKick"></div><div id="chatHost"></div><div id="hLabel"></div></div>
+  <div class="card" id="titleCard"><div id="tPlanes"><div class="pl" id="plFar"></div><div class="pl" id="plMid"></div><div class="pl" id="plNear"></div></div>
+    <div class="inner" id="titleInner"><h1 id="tTitle" style="display:inline-block"></h1><div class="rule" id="tRule"></div><h2 id="tSub"></h2></div><div class="cap" id="tCap"></div></div>
   <div class="card close" id="closeCard"><div class="inner" id="closeInner"></div></div>
-  <div id="ovl"></div>
+  <div id="vig"></div>
+  <canvas id="glx"></canvas>
+  <div id="ovl"><div id="rcHost"></div></div>
   <div id="cap" data-qa-allow-overflow data-qa-allow-overlap></div>   <!-- the lane's active-word lift is deliberate; gates/overlay_gate.py owns caption geometry -->
   <div id="black"></div>
 </div>
+<script src="../node_modules/gsap/dist/gsap.min.js"></script>
 <script src="lib/grammar.js"></script>
 <script src="timing_film.js"></script>
 <script src="lib/timeline.js"></script>
+<script src="lib/motion.js"></script>
 <script src="lib/footage.js"></script>
 <script src="lib/camera.js"></script>
 <script src="lib/seams.js"></script>
 <script src="lib/captions.js"></script>
 <script src="lib/overlays.js"></script>
 <script src="lib/vfx.js"></script>
+<script src="lib/shaders.js"></script>
+<script src="lib/typo.js"></script>
+<script src="lib/blocks2.js"></script>
+<script src="lib/light.js"></script>
+<script src="lib/depth.js"></script>
+<script src="lib/annotate.js"></script>
+<script src="lib/glass.js"></script>
+<script src="lib/reveals.js"></script>
+<script src="lib/stage.js"></script>
+<script src="lib/charts.js"></script>
+<script src="lib/cursor.js"></script>
 <script src="../broll/clips.js"></script>
+<script src="claims_data.js"></script>
+<script src="events_data.js"></script>
 <script src="shots.js"></script>
 <script src="seams_data.js"></script>
 <script src="captions_data.js"></script>
@@ -83,79 +129,161 @@ body.pre #stage{visibility:hidden}
 'use strict';
 const RENDER = /[?&]render/.test(location.search), NOCAP = /[?&]nocap/.test(location.search);
 if (RENDER) document.body.classList.add('pre');
-const T = window.TX, P = T.P, wt = T.wt, F = window.FILM, SH = window.SHOTS, END = T.total;
-const { clamp, rmp, EIO } = window.G;
+const T = window.TX, P = T.P, wt = T.wt, F = window.FILM, SH = window.SHOTS, END = T.total, DIVE = F.dive, SEND = F.send;
+const { clamp, rmp } = window.G;
 const $ = s => document.querySelector(s);
 const op = (e, v) => { e.style.opacity = clamp(v, 0, 1).toFixed(3); };
+const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const cam = $('#camera');
 const lane = FOOT.create({ T: T, CL: window.CLIPS, HL: window.HL, base: '../broll/', els: {
   wrap: $('#clipWrap'), img: $('#clipImg'), reveal: $('#revealHost'), stillHl: $('#stillHl'), stillCurtain: $('#stillCurtain'),
   pageView: $('#pageView'), pageDoc: $('#pageDoc'), pageImg: $('#pageImg'), pageHl: $('#pageHl'), pageCurtain: $('#pageCurtain') } });
 
-$('#tTitle').textContent = F.title; $('#tSub').textContent = F.subtitle; $('#tCap').textContent = F.caption;
-$('#closeInner').innerHTML = F.closeLines.map(l => '<p>' + l + '</p>').join('');
-
 /* seams: the ledger (scenes/seams_data.js, written by export_timeline.js from seams.json) owns every cut it declares */
 const HAS_SEAMS = !!(window.SEAM && window.SEAMS_LEDGER);
 if (HAS_SEAMS) { SEAM.build(window.SEAMS_LEDGER, T, F); const SV = SEAM.validate(SEAM.ledger().rows); if (!SV.ok) throw new Error('seams.json: ' + SV.errors.join('; ')); }
 /* captions: groups are pure arithmetic on the narration's word times (identical in node → the SRT twin) */
-const caps = window.CAP ? CAP.build(T, Object.assign({ end: END + 1.2 }, window.CAPTIONS || {})) : null;
-/* finishing on the recreated cards only: vignette once, seeded grain per frame (never on the footage lane) */
-const grainCtx = $('#grainL').getContext('2d');
+const caps = window.CAP ? CAP.build(T, Object.assign({ end: END + 3.6 }, window.CAPTIONS || {})) : null;   // film length = END + build_film.py TAIL (3.6 s): the lane hides for the credit's last 4 s
 if (window.VFX) VFX.vignette($('#vig'), { amount: 0.12, mid: 0.5, feather: 0.65 });
+/* the staged lane: a wallpaper behind #camera and a window frame around #clipWrap (uniform scale k, nothing redrawn) */
+const stage = STAGE.mount($('#stage'), F.stage), K = 1280 / 1920;
+const bezel = stage.frame.querySelector('#stageBezel');
+CHART.use(window.CLAIMS);                                   // every number a block shows is a claims.json value
+GLASS.install();                                            // tokens as shipped: the KPI call-out uses the 'page' variant (the house ground as a near-opaque frost over the white page)
+let poseNow = { S: 1, tx: 0, ty: 0 };                        // the camera transform of this frame: marks project through it
+/* a footage rect (source px) → stage px through the staged lane (k, F) and the camera (S, tx, ty) */
+const project = r => ({ x: poseNow.S * (stage.geo.footage.x + stage.geo.k * r.x * K) + poseNow.tx, y: poseNow.S * (stage.geo.footage.y + stage.geo.k * r.y * K) + poseNow.ty,
+  w: r.w * K * stage.geo.k * poseNow.S, h: r.h * K * stage.geo.k * poseNow.S });
+ANNOTATE.install({ host: $('#ovl'), project, fps: 30, stroke: tok('--accent') });
+MOTION.gsap.config({ force3D: false });                      // 2D transforms only: a 3D transform promotes a layer whose raster Chrome times on the wall clock
+const glx = GL.create($('#glx'), { width: 1280, height: 720, dpr: 1.5, edgeColor: tok('--paper') });
+let closeCanvas = null;
+
+/* mount once, after the local faces are loaded (TYPO measures glyphs, LIGHT and DEPTH measure boxes): __seek awaits READY */
+async function mount() {
+  await Promise.all(['400 64px ' + tok('--title-font'), '400 22px ' + tok('--body-font'), '600 22px ' + tok('--body-font'), '400 20px Consolas'].map(f => document.fonts.load(f).catch(() => null)));
+  await document.fonts.ready;
+  const paper = tok('--paper'), paper2 = tok('--paper2'), gold = tok('--gold'), ink = tok('--ink'), muted = tok('--muted');
+  const KPI_AT = wt('nb', 'Three');
+  /* hook card: the old way — a recreated chat asks, waits, and is told tomorrow (lands on "answer") */
+  $('#hKick').textContent = F.hookKicker; $('#hLabel').textContent = F.hookLabel;
+  /* every element that arrives later starts in its arrive() from-state, so a worker's first frame equals a stepped one */
+  [['#hKick', 12], ['#hLabel', 6], ['#tCap', 8], ['#tSub', 16]].forEach(([sel, dy]) => MOTION.set($(sel), { opacity: 0, y: dy, scale: 0.985 }));
+  MOTION.block('hook', (tl) => { MOTION.arrive(tl, $('#hKick'), wt('hook', 'Monday') - 0.1, { dy: 12 }); MOTION.arrive(tl, $('#hLabel'), 1.9, { dy: 6, dur: 0.4 }); }, { el: $('#hookCard'), start: 0, end: P.title });
+  const chat = BL2.chatReveal($('#chatHost'), { id: 'hookChat', question: F.hookQuestion, answer: F.hookReply, cps: [18, 24], end: P.title, seed: 7 }).land(wt('hook', 'answer'));
+  /* title card: the line builds word by word on its spoken words, one word promoted; a lamp behind it; planes drift.
+     "Monday," is inked 0.25 s before its word so the cut frame is never an empty plate; the lamp is cream (the card's own
+     ink-soft), not a third hue — the hero word carries the accent */
+  $('#tSub').textContent = F.subtitle; $('#tCap').textContent = F.caption;
+  const T0 = P.title - 0.3;                                   // the block runs 0.3 s ahead of the cut (the card itself is opaque only from P.title), so "Monday," is already inked on the cut frame
+  MOTION.block('title', (tl, el) => {
+    const b = TYPO.centerBuild(tl, $('#tTitle'), { text: F.title, times: [wt('title', 'Monday') - 0.25 - T0, wt('title', 'answered') - 0.1 - T0] });
+    TYPO.heroWord(tl, $('#tTitle'), { word: F.heroWord, at: b.end - 0.1 });
+    LIGHT.bloom(tl, $('#tTitle'), wt('title', 'answered') - T0, { until: F.openEnd - T0, color: tok('--ink-soft'), peak: 0.22, shadow: false });
+    tl.fromTo($('#tRule'), { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: MOTION.EASE.reveal, immediateRender: true }, wt('title', 'Acme') - T0);
+    MOTION.arrive(tl, $('#tCap'), wt('title', 'fictional') - T0, { dy: 8, dur: 0.4 });
+    MOTION.arrive(tl, $('#tSub'), wt('title', 'workflow') - 0.2 - T0, { dy: 16 });
+    tl.fromTo(el, { scale: 1 }, { scale: 1 + 0.012 * (F.openEnd - T0), duration: F.openEnd - T0, ease: 'none', immediateRender: true }, 0);   // the sanctioned slow push
+  }, { el: $('#titleInner'), start: T0, end: F.openEnd });
+  MOTION.block('titleCard', () => {}, { el: $('#titleCard'), start: P.title, end: F.openEnd });
+  DEPTH.planes($('#tPlanes'), [{ el: $('#plFar'), rate: 0.2, blur: 6 }, { el: $('#plMid'), rate: 1 }, { el: $('#plNear'), rate: 6, blur: 22 }],
+    { start: P.title, end: F.openEnd, headline: $('#tTitle') });
+  /* nothing under moving type asks for a compositor layer (the libs set no will-change; lint rule will_change_layer) */
+  /* the opener: the first real still dives onto the staged window; the lane takes over on dive.end (shots.js t0) */
+  const hero = REVEAL.mount(REVEAL.host($('#stage')), { still: '../broll/nb/chrome_0.jpg', target: [stage.geo.footage.x, stage.geo.footage.y, stage.geo.footage.w, stage.geo.footage.h] });
+  MOTION.block('opener', (tl) => { REVEAL.heroDive(tl, { el: hero, land: wt('nb', 'notebook') }); }, { el: null, start: 0, end: DIVE.end + 0.2, hide: false });
+  /* the notebook beat: a small 'page' call-out on blank page beside the boxed output row restates the row's figure — the
+     claims.json value lands DIRECTLY on the spoken number (mode 'land': no 0 → 1 → 2 parade for a "3"), pulse 1.07 */
+  let kpiBody = null;
+  MOTION.block('kpiPanel', (tl, el, api) => {
+    kpiBody = GLASS.panel($('#ovl'), { id: 'kpi', variant: 'page', rect: F.kpiRect, tl, at: 0.1, until: api.exitAt, window: [KPI_AT - 0.6, P.ask] }).body;
+  }, { el: null, start: KPI_AT - 0.6, end: P.ask, exit: 0.3, hide: false });
+  const kpi = BL2.countUp(kpiBody, { id: 'kpi', end: P.ask - 0.3, exit: 'fade', value: CHART.resolve('regions_over_target').value, label: F.kpiLabel, sub: F.kpiSub, size: 56, mode: 'land' }).land(KPI_AT);
+  /* the question beat: a tight spotlight frames the composer (the hole IS the composer, not a glow bar), then glides to the
+     Send control as the hand arrives; the typed line is its own caption, so the lane is 'drop' for this phase */
+  const ASK0 = P.ask + 0.2;
+  MOTION.block('askMarks', (tl) => {
+    ANNOTATE.spotlight(tl, [{ rect: F.marks.composer, at: 0 }, { rect: F.marks.send, at: SEND - 1.0 - ASK0 - 0.3 }], 0.3,
+      { until: SEND + 0.45 - ASK0, dim: 'rgba(5,22,28,.38)', clear: 0.62, opaque: 0.95, pad: 1.0, z: 0 });
+  }, { el: null, start: ASK0, end: SEND + 0.6, hide: false });
+  /* the answer beat: the circle lands on the figure (claims.json figures[0]) as "back" is spoken; the receipt lands on "governed" */
+  const ANS0 = SH[3].t0;
+  MOTION.block('answerMark', (tl) => { ANNOTATE.circle(tl, F.marks.figure, Math.max(0.05, wt('answer', 'back') + 0.1 - ANS0), { seed: 11, until: F.close - 0.3 - ANS0 }); }, { el: null, start: ANS0, end: F.close, hide: false });
+  const rc = BL2.receipt($('#rcHost'), { id: 'receipt', parts: F.receipt, end: F.close, exit: 'up' }).land(wt('answer', 'governed') + 0.1);
+  /* the presenter's hand, redrawn from the recording's telemetry (events.jsonl): inside the frame, beside the lane, never in it */
+  if (window.CURSOR && window.EVENTS && window.EVENTS.length) {
+    const cur = CURSOR.mount(stage.frame, window.EVENTS, { scale: 1.75, color: ink, outline: paper, spans: [{ t0: SEND - 0.9, t1: SEND, src: 13.7 }, { t0: SEND, t1: F.close, src: 14.6 }] });
+    cur.layer.style.transformOrigin = '0 0'; cur.layer.style.transform = 'translate(0px,' + stage.geo.bezel + 'px) scale(' + stage.geo.k.toFixed(5) + ')';
+  }
+  /* the one GL accent, straight from the seam ledger: footage (the answer still) -> the closing card's ground, 0.4 s with the
+     hidden step at the row's split (0.15: two frames of dim streak over the footage side, the rest over the card) */
+  closeCanvas = GL.cardCanvas(glx, { dpr: 1.5, bg: paper, draw: (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, paper); g.addColorStop(1, paper2); c.fillStyle = g; c.fillRect(0, 0, w, h); } });
+  const seamRows = HAS_SEAMS ? SEAM.ledger().rows : [];
+  (HAS_SEAMS ? SEAM.glSeams() : []).forEach(g => { const row = seamRows.find(r => r.id === g.id) || {};
+    GL.cutTransition(glx, { at: g.at, dur: g.dur, name: g.name, split: row.split, from: () => lane.imageFor('answer'), to: () => closeCanvas, params: g.opts }); });
+  await lane.preload('answer');
+  /* closing card: the lockup's own kicker (22 px, ink-soft) answers the first two "One"s the moment the leak window has
+     cleared, the title builds on its spoken words, the rule draws on "trust" — then the card HOLDS (block end past the
+     render tail) while build_film.py stamps the credit */
+  const leakEnd = (HAS_SEAMS ? SEAM.glSeams() : []).reduce((m, g) => Math.max(m, g.at + g.dur), F.close);
+  MOTION.block('close', (tl) => {
+    const words = ['One', 'answer', 'the', 'whole', 'team', 'can', 'trust'].map((w, i) => wt('close', w, w === 'One' ? 3 : 1) - 0.1 - F.close);
+    TYPO.lockup(tl, $('#closeInner'), { at: wt('close', 'trust') - 0.5 - F.close, kicker: F.closeKicker, kickerAt: Math.max(leakEnd, wt('close', 'notebook') - 0.15) - F.close,
+      title: F.closeTitle, sub: F.closeSub, build: 'center', times: words, sizes: { kicker: 22 }, colors: { sub: muted, kicker: tok('--ink-soft') } });
+  }, { el: $('#closeCard'), start: F.close, end: END + 4 });
+  window.__sync = [].concat(chat.sync().map(s => ({ id: 'hookChat:' + s.id, t: s.t, act: 'open' })), kpi.sync().map(s => ({ id: 'kpi:' + s.id, t: s.t, act: 'demo' })), rc.sync().map(s => ({ id: 'receipt:' + s.id, t: s.t, act: 'demo' })));
+  await (window.SKIN && SKIN.ready ? SKIN.ready() : null);
+}
+const READY = mount();
 
 /* one wrapper carries both sides of a footage-to-footage seam: "#camera" is the exit row, "#camera-in" the entry row */
 function seamOff(t) { if (!HAS_SEAMS) return null; const a = SEAM.offset(t, '#camera'), b = SEAM.offset(t, '#camera-in'); return (b && b.visible) ? b : (a && a.visible) ? a : (b || a); }
-function applyCam(s, cx, cy) {
-  const hw = 640 / s, hh = 360 / s, x = clamp(cx, hw, 1280 - hw), y = clamp(cy, hh, 720 - hh);
+/* pose {s, cx, cy} in footage space → the camera transform. Staged beats keep the lane at k inside the window (the footage
+   centre stays where the layout put it); the others undo k so the footage fills the stage, as a v4 film did. */
+let lookStaged = null;
+function applyCam(p, staged) {
+  const G = stage.geo, k = G.k, hw = 640 / p.s, hh = 360 / p.s, x = clamp(p.cx, hw, 1280 - hw), y = clamp(p.cy, hh, 720 - hh);
+  const home = staged ? [640, G.footage.y + 360 * k] : [640, 360], cx = G.footage.x + k * x, cy = G.footage.y + k * y;
+  let S = staged ? p.s : p.s / k, tx = home[0] - S * cx, ty = home[1] - S * cy;
   const off = seamOff(t_now);
-  let S = s, tx = 640 - s * x, ty = 360 - s * y;
-  if (off) { S = s * off.s; tx = 640 - S * x + off.x; ty = 360 - S * y + off.y; cam.style.opacity = off.visible ? off.op.toFixed(3) : '0'; cam.style.filter = off.blur > 0.05 ? 'blur(' + off.blur.toFixed(1) + 'px)' : 'none'; }
+  if (off) { S *= off.s; tx = home[0] - S * cx + off.x; ty = home[1] - S * cy + off.y; cam.style.opacity = off.visible ? off.op.toFixed(3) : '0'; cam.style.filter = off.blur > 0.05 ? 'blur(' + off.blur.toFixed(1) + 'px)' : 'none'; }
   else { cam.style.opacity = '1'; cam.style.filter = 'none'; }
-  cam.style.transform = (S < 1.0005 && !off) ? 'none' : 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + S.toFixed(4) + ')';
+  cam.style.transform = 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + S.toFixed(4) + ')';
+  poseNow = { S, tx, ty };
+  if (lookStaged !== staged) { lookStaged = staged; stage.frame.style.borderRadius = staged ? '14px' : '0px'; if (bezel) bezel.style.visibility = staged ? '' : 'hidden'; }
+  stage.frame.style.visibility = t_now >= F.openEnd ? 'visible' : 'hidden';   // the empty window appears with the plate, never under a fading card
 }
-function rise(e, t, a, d) { const u = EIO(rmp(t, a, a + (d || 0.5))); e.style.opacity = u.toFixed(3); e.style.transform = 'translateY(' + ((1 - u) * 12).toFixed(1) + 'px)'; }
 
 let t_now = 0;
 function frame(t) {
   t_now = t;
-  let pend = [], c = { s: 1, cx: 640, cy: 360 };
-  /* title card: each line lands on a spoken word; a slow push (1.2 %/s) is the only idle motion; the seam owns its exit */
-  const tc = $('#titleCard'), onTitle = t < F.openEnd;
-  op(tc, HAS_SEAMS ? (onTitle ? 1 : 0) : (onTitle ? 1 : 1 - rmp(t, F.openEnd, F.openEnd + 0.25)));
-  $('#titleInner').style.transform = 'scale(' + (1 + 0.012 * Math.min(t, F.openEnd)).toFixed(4) + ')';
-  rise($('#tTitle'), t, wt('hook', 'Monday') - 0.1); rise($('#tSub'), t, wt('title', 'workflow') - 0.2);
-  op($('#tRule'), rmp(t, wt('hook', 'question') - 0.1, wt('hook', 'question') + 0.4)); op($('#tCap'), rmp(t, wt('title', 'fictional'), wt('title', 'fictional') + 0.4));
-  /* footage: the lane draws the pixels, CAM frames them (named eases, punches, caret follow), the seam offsets the camera */
-  const sh = t >= F.openEnd && t < F.close ? lane.shotAt(SH, t) : null;
-  if (sh) { c = lane.draw(sh, t); pend = c.pending; if (window.CAM) { const pose = CAM.resolve(sh, t); c = { s: pose.s, cx: pose.cx, cy: pose.cy, pending: pend }; } }
+  let pend = [], pose = { s: 1, cx: 640, cy: 360 }, staged = true;
+  /* footage: the lane draws the pixels, CAM frames them (named eases, punches), the stage places the lane, the seam offsets the camera */
+  const sh = t >= DIVE.end && t < F.close ? lane.shotAt(SH, t) : null;
+  if (sh) { const c = lane.draw(sh, t); pend = c.pending; const q = CAM.resolve(sh, t); pose = { s: q.s, cx: q.cx, cy: q.cy }; staged = !!sh.staged; }
   else lane.hide();
-  applyCam(c.s, c.cx, c.cy);
-  /* closing card: lines land on the three "One"s; the seam brings the card in */
-  const cc = $('#closeCard'), onClose = t >= F.close;
-  op(cc, HAS_SEAMS ? (onClose ? 1 : 0) : rmp(t, F.close - 0.25, F.close + 0.2));
-  $('#closeInner').style.transform = 'scale(' + (1 + 0.012 * Math.max(0, t - F.close)).toFixed(4) + ')';
-  // the first line is already up when the seam carries the card in (a seam needs a visible carrier); the others land on their words
-  Array.from($('#closeInner').children).forEach((p, i) => rise(p, t, i === 0 ? F.close - 0.6 : wt('close', 'One', i + 1) - 0.1));
-  /* finishing: grain + vignette only while a recreated card is up; the grain fades out around every seam so the
-     seam gate (and the eye) reads the card's own motion, not per-frame noise */
-  const onCard = onTitle || onClose;
-  const nearSeam = HAS_SEAMS ? Math.max(0, ...SEAM.windows().map(w => 1 - clamp(Math.min(Math.abs(t - w.t0), Math.abs(t - w.t1), t >= w.t0 && t <= w.t1 ? 0 : 1) / 0.5, 0, 1))) : 0;
-  $('#grainL').style.opacity = onCard ? (1 - nearSeam).toFixed(3) : '0'; $('#vig').style.opacity = onCard ? '1' : '0';
-  if (onCard && nearSeam < 1 && window.VFX) VFX.grain(grainCtx, t, { amount: 0.12, size: 0.18, roughness: 0.65, fps: 30 });
+  applyCam(pose, staged);
+  /* the cards: one per window (MOTION also hides them); written every frame so a seam's last offset never lingers */
+  op($('#hookCard'), t < P.title ? 1 : 0); op($('#titleCard'), t >= P.title && t < F.openEnd ? 1 : 0); op($('#closeCard'), t >= F.close ? 1 : 0);
+  op($('#vig'), t < F.openEnd ? 1 : 0);                      // finishing on the recreated cards only
+  /* every timeline on the clock: cards, type, blocks, planes, light, marks (they read poseNow), reveals, cursor */
+  MOTION.seek(t);
+  if (t >= F.close - 0.6 && t < F.close) lane.imageFor('answer');   // the GL texture's decode joins this frame's pending list
+  GL.drive(glx, t);                                           // a no-op outside every gl seam window
   /* lower thirds + caption lane in screen space (the lane lifts above a visible lower third, hides under the credit) */
-  const lts = window.OVL ? F.acts.map((a, i) => OVL.lowerThird($('#ovl'), t, { id: 'lt' + i, t0: a.t0 + 0.3, dur: 4.8, label: a.label, text: a.text, variant: a.variant || 'auto', phase: a.phase })) : [];
+  const lts = window.OVL ? F.acts.map((a, i) => OVL.lowerThird($('#ovl'), t, { id: 'lt' + i, t0: a.t0 + 0.3, dur: a.dur || 4.8, bottom: a.bottom, label: a.label, text: a.text, variant: a.variant || 'auto', phase: a.phase, accent: tok('--muted') })) : [];   // persona labels in the muted ink: the accent is spent once per beat, on the focal element
   if (caps && !NOCAP) caps.draw($('#cap'), t, { avoid: lts.filter(l => l && l.visible).map(l => l.rect) });
-  /* the ledger writes the card layers it owns (title out, close in) */
+  /* the ledger writes the card layers it owns (hook out, title in); the camera composes its own offset above */
   if (HAS_SEAMS) SEAM.apply(t, ['#camera']);
   /* head fade-in only: the film ends on the closing card, where build_film.py stamps the mandatory credit */
   op($('#black'), 1 - rmp(t, 0, 0.3));
+  const rp = REVEAL.pending(); if (rp) pend.push(rp);
   return pend.length ? Promise.all(pend) : undefined;
 }
 let t0 = null;
 function loop(now) { if (t0 === null) t0 = now; const t = (now - t0) / 1000; frame(t); if (!RENDER && t > END + 1) t0 = now; requestAnimationFrame(loop); }
-window.__seek = t => { document.body.classList.remove('pre'); lane.reset(); const a = frame(t); return Promise.resolve(a).then(() => frame(t)); };
+window.__seek = t => READY.then(() => { document.body.classList.remove('pre'); lane.reset(); const a = frame(t); return Promise.resolve(a).then(() => frame(t)); });
 window.__step = t => frame(t);
 window.__total = END;
-if (!RENDER) { const q = new URLSearchParams(location.search); if (q.has('t')) window.__seek(parseFloat(q.get('t'))); else requestAnimationFrame(loop); }
+if (!RENDER) { const q = new URLSearchParams(location.search); if (q.has('t')) window.__seek(parseFloat(q.get('t'))); else READY.then(() => requestAnimationFrame(loop)); }
 </script></body></html>

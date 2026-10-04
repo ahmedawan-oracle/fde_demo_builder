@@ -3,6 +3,8 @@
 
     python gates/snapshot.py scenes/film.html [--at 3.0,12.8] [--out out/snapshots] [--golden golden]
                              [--update] [--max-changed 1.0] [--psnr 40] [--png] [--json] [--selftest]
+    python gates/snapshot.py --pairs [out/<film>.mp4 | scenes/film.html] [--out out/pairs] [--name film] [--png] [--json]
+    python gates/snapshot.py --selftest --pairs            (the pairs fixture alone: synthetic film, no Chrome)
 
 Reviewers read a film from stills before they watch it. One capture per shot makes a rebuild reviewable in a
 single image, and a diff against the previous run says exactly which shot a narration change moved.
@@ -27,6 +29,16 @@ PSNR >= --psnr (default 40 dB). Changed shots go into out/snapshots/diff.jpg as 
 
 QA gate: GATE_NAMES = ['golden']; runs only when golden/ exists (otherwise PASS with an info detail).
 qa.json: {"snapshot": {"golden": "golden", "max_changed": 1.0, "psnr": 40}}.
+
+First and last frame per shot (v5.1, --pairs). A shot is approved on two stills before anyone watches motion: the
+frame it opens on and the frame the next cut lands on. `--pairs` captures t0 + 0.1 s and t1 - 0.1 s for every
+segment of the film — the title card, each footage shot, the closing card — into out/pairs/<label>_start.jpg and
+<label>_end.jpg, tiles them as rows (start | end) in out/pairs/pairs.jpg and lists them in out/pairs/pairs.json
+({label, t0, t1, start:{t, file}, end:{t, file}, changed_pct}). From a rendered film the frames come straight out of
+ffmpeg (no browser); from scenes/film.html they go through the canary probe like the golden captures. The review
+pack shows the pair per beat with "Approve start / Approve end" and writes out/review/approvals.json;
+tools/storyboard.py check --build then refuses while an END frame is unapproved. Segments shorter than 0.3 s are
+skipped (there is no still to approve); changed_pct < 0.5 % between the two frames flags a shot that never moved.
 """
 import json
 import math
@@ -141,8 +153,9 @@ def capture(scene, plan, out_dir, png=False, project=None, fps=30):
     times = [t for _, t in plan]
     files, meta = CAN.probe(scene, times, 'cold', os.path.join(out_dir, '_raw'), prefix='s_', fps=fps, png=True, project=project)
     out = {}
-    for lab, t in plan:
-        src = files['%.3f' % t]
+    by_t = {round(float(k), 4): v for k, v in files.items()}   # the probe keys its files by the time string it was given (6 decimals
+    for lab, t in plan:                                          # since the frame-exact canary fix): match on the value, not a 3-decimal string
+        src = by_t[round(t, 4)]
         dst = os.path.join(out_dir, '%s.%s' % (lab, 'png' if png else 'jpg'))
         with Image.open(src) as im:
             im = im.convert('RGB')
@@ -229,6 +242,189 @@ def snapshot(scene, project=None, name='film', at=(), out_dir=None, golden_dir=N
     return rep
 
 
+# ------------------------------------------------------------------------------------------------ first / last frame pairs
+PAIR_IN, PAIR_MIN, PAIR_STATIC = 0.1, 0.3, 0.5
+
+
+def plan_pairs(project, name='film', total=None, fps=30):
+    """[(label, t0, t1)] — every segment of the film: title card, each shot, closing card (shots.js via node; else
+    out/timeline.json shots; else the spans between cuts)."""
+    info = load_shots(project, name)
+    segs = []
+    if info:
+        total = total or float(info['total'])
+        shots = sorted((s for s in info['shots'] if s.get('t0') is not None), key=lambda s: s['t0'])
+        if info.get('openEnd'):
+            segs.append(('title', 0.0, float(info['openEnd'])))
+        seen = {}
+        for sh in shots:
+            lab = sh.get('clip') or 'shot'
+            seen[lab] = seen.get(lab, 0) + 1
+            t1 = sh.get('t1') if sh.get('t1') is not None else (info.get('close') or total)
+            segs.append((lab if seen[lab] == 1 else '%s_%d' % (lab, seen[lab]), float(sh['t0']), float(t1)))
+        if info.get('close') is not None:
+            segs.append(('close', float(info['close']), float(total)))
+    else:
+        tl = os.path.join(project, 'out', 'timeline.json')
+        T = json.load(open(tl, encoding='utf-8')) if os.path.exists(tl) else {}
+        total = total or float(T.get('total', 0) or 0) or 10.0
+        shots = sorted((s for s in T.get('shots', []) if s.get('t0') is not None), key=lambda s: s['t0'])
+        if shots:
+            if shots[0]['t0'] > PAIR_MIN:
+                segs.append(('title', 0.0, float(shots[0]['t0'])))
+            seen = {}
+            for sh in shots:
+                lab = sh.get('clip') or 'shot'
+                seen[lab] = seen.get(lab, 0) + 1
+                t1 = sh['t1'] if sh.get('t1') is not None else total
+                segs.append((lab if seen[lab] == 1 else '%s_%d' % (lab, seen[lab]), float(sh['t0']), float(t1)))
+            if total - shots[-1].get('t1', total) > PAIR_MIN and shots[-1].get('t1') is not None:
+                segs.append(('close', float(shots[-1]['t1']), float(total)))
+        else:
+            edges = [0.0] + sorted(c for c in T.get('cuts', []) if 0 < c < total) + [total]
+            for i in range(len(edges) - 1):
+                segs.append(('seg%d' % (i + 1), edges[i], edges[i + 1]))
+    out = []
+    for lab, a, b in segs:
+        if b - a < PAIR_MIN:
+            continue
+        out.append((lab, CAN.snap(a + PAIR_IN, fps), CAN.snap(max(a + PAIR_IN, b - PAIR_IN - 0.5 / fps), fps)))
+    return out, total
+
+
+def _film_frame(film, t, path, w, h, png=False):
+    """One frame of the rendered film at t (frame-exact seek) → path."""
+    vf = 'scale=%d:%d:flags=lanczos' % (w, h)
+    r = subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-ss', '%.4f' % max(0.0, t - 0.5 / 30), '-i', film, '-frames:v', '1', '-vf', vf]
+                       + ([] if png else ['-q:v', '3']) + [path], capture_output=True)
+    return r.returncode == 0 and os.path.exists(path)
+
+
+def pairs(source, project=None, name='film', out_dir=None, png=False, fps=30, total=None):
+    """Capture the first/last frame of every segment from a film (ffmpeg) or a scene (canary probe) → out/pairs/."""
+    source = os.path.abspath(source)
+    is_film = source.lower().endswith(('.mp4', '.mov', '.mkv', '.webm'))
+    project = project or (os.path.dirname(os.path.dirname(source)) if is_film else os.path.dirname(os.path.dirname(source)))
+    out_dir = out_dir or os.path.join(project, 'out', 'pairs')
+    os.makedirs(out_dir, exist_ok=True)
+    if is_film and not total:
+        r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', source], capture_output=True, text=True)
+        try:
+            total = float(r.stdout.strip())
+        except ValueError:
+            total = None
+    plan, total = plan_pairs(project, name, total, fps)
+    rows, errors = [], []
+    w, h = (1280, 720) if png else (GOLDEN_W, GOLDEN_H)
+    ext = 'png' if png else 'jpg'
+    if is_film:
+        for lab, a, b in plan:
+            row = {'label': lab, 't0': round(a - PAIR_IN, 3), 't1': round(b + PAIR_IN, 3)}
+            for side, t in (('start', a), ('end', b)):
+                dst = os.path.join(out_dir, '%s_%s.%s' % (lab, side, ext))
+                if _film_frame(source, t, dst, w, h, png):
+                    row[side] = {'t': t, 'file': dst}
+                else:
+                    errors.append('%s %s @%.3f: no frame' % (lab, side, t))
+            rows.append(row)
+    else:
+        times = sorted(set([t for _, a, b in plan for t in (a, b)]))
+        files, meta = CAN.probe(source, times, 'cold', os.path.join(out_dir, '_raw'), prefix='p_', fps=fps, png=True, project=project)
+        errors.extend(meta.get('errors', []))
+        by_t = {round(float(k), 4): v for k, v in files.items()}
+        from PIL import Image
+        for lab, a, b in plan:
+            row = {'label': lab, 't0': round(a - PAIR_IN, 3), 't1': round(b + PAIR_IN, 3)}
+            for side, t in (('start', a), ('end', b)):
+                src = by_t.get(round(t, 4))
+                if not src:
+                    errors.append('%s %s @%.3f: no capture' % (lab, side, t)); continue
+                dst = os.path.join(out_dir, '%s_%s.%s' % (lab, side, ext))
+                with Image.open(src) as im:
+                    im = im.convert('RGB')
+                    if not png:
+                        im = im.resize((w, h), Image.LANCZOS); im.save(dst, quality=GOLDEN_Q, optimize=True)
+                    else:
+                        im.save(dst)
+                row[side] = {'t': t, 'file': dst}
+            rows.append(row)
+        shutil.rmtree(os.path.join(out_dir, '_raw'), ignore_errors=True)
+    # how much the shot changed between its two frames (a shot that never moved is a slide)
+    for row in rows:
+        if row.get('start') and row.get('end'):
+            try:
+                row['changed_pct'] = CAN.compare(row['start']['file'], row['end']['file'])['changed_pct']
+                row['static'] = row['changed_pct'] < PAIR_STATIC
+            except Exception:
+                pass
+    sheet = pairs_sheet(rows, os.path.join(out_dir, 'pairs.jpg'))
+    rep = {'source': source, 'total': total, 'pairs': rows, 'sheet': sheet, 'errors': errors, 'ok': not errors and bool(rows)}
+    json.dump(rep, open(os.path.join(out_dir, 'pairs.json'), 'w', encoding='utf-8'), indent=1, default=str)
+    return rep
+
+
+def pairs_sheet(rows, path):
+    """rows of start | end tiles, one row per segment, labelled with the time."""
+    from PIL import Image
+    rows = [r for r in rows if r.get('start') and r.get('end')]
+    if not rows:
+        return None
+    tw, th = 480, 270
+    sheet = Image.new('RGB', (2 * tw, th * len(rows)), (5, 22, 28))
+    for i, r in enumerate(rows):
+        for k, side in enumerate(('start', 'end')):
+            with Image.open(r[side]['file']) as im:
+                tile = _label(im.convert('RGB').resize((tw, th), Image.LANCZOS), '%s  %s  t=%.2f' % (r['label'], side.upper(), r[side]['t']))
+            sheet.paste(tile, (k * tw, i * th))
+    sheet.save(path, quality=88)
+    return path
+
+
+def selftest_pairs():
+    """A synthetic 6 s film (numpy → ffmpeg, no browser): title card, two shots, a close; one shot never moves."""
+    import numpy as np
+    d = tempfile.mkdtemp(prefix='pairs_selftest_')
+    os.makedirs(os.path.join(d, 'out'))
+    fps, total = 30, 6.0
+    film = os.path.join(d, 'out', 'film.mp4')
+    N = int(total * fps)
+    p = subprocess.Popen(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', '320x180', '-r', str(fps), '-i', '-',
+                          '-c:v', 'libx264', '-crf', '17', '-pix_fmt', 'yuv420p', film], stdin=subprocess.PIPE)
+    for k in range(N):
+        t = k / fps
+        f = np.full((180, 320), 20, np.uint8)
+        if t < 1.5:                       # title: a bar grows
+            f[60:120, 20:20 + int(280 * t / 1.5)] = 220
+        elif t < 3.5:                     # shot a: a square slides right
+            x = 20 + int(200 * (t - 1.5) / 2.0); f[40:140, x:x + 60] = 180
+        elif t < 5.0:                     # shot b: nothing moves at all
+            f[50:130, 100:220] = 120
+        else:                             # close: a line draws
+            f[90:94, 40:40 + int(240 * (t - 5.0))] = 240
+        p.stdin.write(f.tobytes())
+    p.stdin.close(); p.wait()
+    json.dump({'total': total, 'cuts': [1.5, 3.5, 5.0], 'shots': [{'clip': 'a', 't0': 1.5, 't1': 3.5}, {'clip': 'b', 't0': 3.5, 't1': 5.0}]},
+              open(os.path.join(d, 'out', 'timeline.json'), 'w'))
+    rep = pairs(film, project=d)
+    labs = [r['label'] for r in rep['pairs']]
+    ok = True
+
+    def check(cond, msg):
+        nonlocal ok
+        print('  %s  %s' % ('PASS' if cond else 'FAIL', msg)); ok = ok and bool(cond)
+    check(labs == ['title', 'a', 'b', 'close'], 'plan: title, each shot, close (%s)' % labs)
+    check(all(os.path.exists(r[s]['file']) for r in rep['pairs'] for s in ('start', 'end')) and os.path.exists(rep['sheet']), '8 frames + pairs.jpg written')
+    check(abs(rep['pairs'][1]['start']['t'] - 1.6) < 1e-6 and abs(rep['pairs'][1]['end']['t'] - (3.5 - 0.1 - 1 / 60.0)) < 0.02, 'times: t0 + 0.1 and t1 - 0.1 (%.3f, %.3f)' % (rep['pairs'][1]['start']['t'], rep['pairs'][1]['end']['t']))
+    check(rep['pairs'][1]['changed_pct'] > 2 and rep['pairs'][2].get('static') is True, 'changed_pct: the sliding shot moved (%.1f %%), the frozen one is flagged static' % rep['pairs'][1]['changed_pct'])
+    check(os.path.exists(os.path.join(d, 'out', 'pairs', 'pairs.json')) and rep['ok'], 'pairs.json written, no errors')
+    from PIL import Image
+    with Image.open(rep['sheet']) as im:
+        check(im.size == (960, 270 * 4), 'sheet is 2 columns x 4 rows (%s)' % (im.size,))
+    shutil.rmtree(d, ignore_errors=True)
+    print('selftest pairs ' + ('PASS' if ok else 'FAIL'))
+    return ok
+
+
 # ------------------------------------------------------------------------------------------------ QA gate
 def run(ctx):
     q = (ctx.get('qa') or {}).get('snapshot', {}) or {}
@@ -272,8 +468,10 @@ def selftest():
 
 
 def main(argv):
+    if '--selftest' in argv and '--pairs' in argv:
+        return 0 if selftest_pairs() else 1
     if '--selftest' in argv:
-        return 0 if selftest() else 1
+        return 0 if (selftest() and selftest_pairs()) else 1
     args = [a for a in argv if not a.startswith('--')]
     def opt(name, default=None):
         if name in argv and argv.index(name) + 1 < len(argv):
@@ -285,6 +483,27 @@ def main(argv):
     at = [float(x) for x in (opt('--at', '') or '').split(',') if x.strip()]
     out = opt('--out'); golden = opt('--golden'); mc = float(opt('--max-changed', MAX_CHANGED_PCT)); ps = float(opt('--psnr', PSNR_PASS))
     name = opt('--name', 'film')
+    if '--pairs' in argv:
+        src = args[0] if args else None
+        if not src:
+            # default: the rendered film named in film.json, else scenes/film.html
+            cfg = json.load(open('film.json', encoding='utf-8')) if os.path.exists('film.json') else {}
+            src = cfg.get('output', 'out/%s.mp4' % cfg.get('name', 'film'))
+            if not os.path.exists(src):
+                src = 'scenes/film.html'
+        if not os.path.exists(src):
+            print('--pairs: no film or scene at %s' % src); return 2
+        rep = pairs(src, out_dir=out, png='--png' in argv, name=name)
+        if '--json' in argv:
+            print(json.dumps(rep, indent=1, default=str)); return 0 if rep['ok'] else 1
+        for r in rep['pairs']:
+            print('  %-10s %6.2f–%-6.2f  start %s  end %s%s' % (r['label'], r['t0'], r['t1'], os.path.basename(r.get('start', {}).get('file', '?')),
+                  os.path.basename(r.get('end', {}).get('file', '?')), '  STATIC (%.2f%%)' % r['changed_pct'] if r.get('static') else ''))
+        print('pairs sheet  %s' % (os.path.relpath(rep['sheet']) if rep['sheet'] else 'none'))
+        for e in rep['errors']:
+            print('  ' + e)
+        print('pairs ' + ('OK' if rep['ok'] else 'FAIL') + ' — review them in the pack (tools/review_pack.py build), approve start/end per beat')
+        return 0 if rep['ok'] else 1
     if not args:
         print(__doc__.split('\n\n')[0]); return 2
     rep = snapshot(args[0], at=at, out_dir=out, golden_dir=golden, update='--update' in argv, png='--png' in argv, max_changed=mc, psnr_pass=ps, name=name)

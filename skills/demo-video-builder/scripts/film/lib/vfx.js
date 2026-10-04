@@ -8,8 +8,11 @@
      matte           luma / alpha matte as a CSS mask: a word, a wipe or a circle that reveals the layer behind it
      fbm / haze      seeded value-noise field (32-bit lattice hash) drawn as a low-res tile for dark card backdrops
      glitch, wave    the "problem beat" devices: 60-band tear + RGB split, and a sine wave warp — RECREATED ONLY
-     seam            the shader-transition grammar re-expressed as six canvas/CSS seams for recreated ↔ footage
+     seam            RETIRED (v5): picture-to-picture transitions belong to GL.cutTransition (lib/shaders.js). The six
+                     2D seams stay as thin shims — with GL loaded they hand the window to the GL twin (and warn once),
+                     without it they draw exactly as before, so a v4 project renders unchanged
      ramp            speed-ramp maths for seq clips: a (t, rate) lane → source time (trapezoid integral)
+     Node: node lib/vfx.js --selftest  (pure parts: noise, grain seeds, seam mapping, ramp maths; exit 0 ok / 1 fails)
 
    Contract (same as grammar.js / footage.js)
      - Pure functions of t plus explicit state (a ctx, an element, an options object). No wall clock, no
@@ -24,7 +27,8 @@
      vignette: darkening 0.75*amount, superellipse power 8..1.8 by roundness, midpoint 0.22..1.08 of the
                half-frame, feather 0.08..0.72; restrained amounts 0.10–0.18.
      grain:    cells 1..6 px by size, fine layer mixed at 0.35 by roughness, strength 0.025..0.08 masked
-               to midtones (soft-light does the masking here); presets 0.08–0.16 at size 0.12–0.18.
+               to midtones (soft-light does the masking here); presets 0.08–0.16 at size 0.12–0.18; seed = the
+               frame index (step 1) or, with step: 15, one seed per half second — the filmic stepped grain for cards.
      bloom:    9 taps (0.227, 0.1946, 0.1216, 0.054, 0.0162), radius 8, one-click amount 0.55.
      glitch:   envelope u(1-u)*4 (zero at both ends), 60 bands, tear 0.18, RGB shift 0.035, 8 levels at peak.
      wave:     height 10 px, width 40 px, 1 wave/s, sine only, transparent beyond the edges.
@@ -68,7 +72,7 @@
     return c;
   }
 
-  /* ---------- 32-bit lattice hash + value-noise fBm (re-expressed) ---------- */
+  /* ---------- 32-bit lattice hash + value-noise fBm ---------- */
   function hash(ix, iy, seed) {
     let h = ((Math.imul(ix | 0, 374761393) ^ Math.imul(iy | 0, 668265263) ^ Math.imul(seed | 0, 1274126177)) + 2654435769) >>> 0;
     h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 1274126177) >>> 0; h = (h ^ (h >>> 16)) >>> 0;
@@ -130,17 +134,21 @@
   /* grain(ctx, t, o): fills ctx's canvas with mid-grey noise (128 ± d) for a layer styled
        mix-blend-mode: soft-light   (50 % grey is identity; soft-light fades the effect in shadows and
                                      highlights, which stands in for the measured midtone mask)
-     o: {amount:0.12, size:0.18, roughness:0.65, fps:30, seed:0, res:2, gain:1, W, H}
+     o: {amount:0.12, size:0.18, roughness:0.65, fps:30, seed:0, step:1, res:2, gain:1, W, H}
      cell px = 1..6 by size; base = hash(cell) - hash(cell+offset) (triangular ±1); fine = per-pixel hash - 0.5;
      grain = mix(base*0.7, base + fine*0.35, roughness); d = grain * 0.16 * amount * gain (soft-light ≈ halves it,
-     so the on-screen offset is amount*0.08*grain — the measured peak strength). Seed = frame index. Computed at
-     1/res resolution and upscaled nearest-neighbour; cells ≥ 2 px survive JPEG q96. */
+     so the on-screen offset is amount*0.08*grain — the measured peak strength). Seed = seed + floor(frame / step):
+     step 1 (default, the v4 look) re-seeds every frame; step 15 (VFX.GRAIN_STEP) holds one grain plate for half a
+     second — the filmic stepped grain, for recreated cards only. Computed at 1/res resolution and upscaled
+     nearest-neighbour; cells ≥ 2 px survive JPEG q96. */
+  const GRAIN_STEP = 15;
+  const grainSeed = (t, o) => ((o.seed | 0) + Math.floor(frameIndex(t, o.fps) / Math.max(1, (o.step | 0) || 1))) | 0;
   function grain(ctx, t, o) {
     o = o || {}; assertRecreated(ctx, 'grain');
     const W = o.W || ctx.canvas.width, H = o.H || ctx.canvas.height, res = Math.max(1, o.res || 2);
     const amount = clamp(o.amount === undefined ? 0.12 : o.amount, 0, 1), rough = clamp(o.roughness === undefined ? 0.65 : o.roughness, 0, 1);
     const cell = Math.max(1, Math.round(lerp(1, 6, clamp(o.size === undefined ? 0.18 : o.size, 0, 1))));
-    const seed = ((o.seed | 0) + frameIndex(t, o.fps)) | 0, k = 0.16 * amount * (o.gain === undefined ? 1 : o.gain) * 255;
+    const seed = grainSeed(t, o), k = 0.16 * amount * (o.gain === undefined ? 1 : o.gain) * 255;
     const w = Math.ceil(W / res), h = Math.ceil(H / res), tile = off('grain', w, h), tctx = tile.getContext('2d');
     const im = tctx.createImageData(w, h), d = im.data, ncx = Math.ceil(w * res / cell) + 1, baseRow = new Float32Array(ncx);
     let lastCy = -1;
@@ -345,7 +353,11 @@
     return height;
   }
 
-  /* ---------- seams: the shader grammar as six canvas/CSS seams ---------- */
+  /* ---------- seams: RETIRED — GL.cutTransition (lib/shaders.js) owns every picture-to-picture transition ----------
+     The six 2D seams below are thin shims. Each kind has a GL twin (SEAM_GL); when lib/shaders.js is loaded and the
+     options carry {gl: ctx, from: () => src, to: () => src}, seam()/drawSeam() hand the window to GL and warn once.
+     Without GL (or without those options) they draw exactly as in v4, so an old project renders unchanged.
+     A GL window over footage is still ≤ 0.5 s and still a seams.json row: the ledger owns the time. */
   const SEAMS = {
     'flash-white':     { kind: 'css',    energy: 'medium', dur: 0.5, use: 'cold open → first real screen; payoff card → close. The transition IS the exit.' },
     'blur-dissolve':   { kind: 'css',    energy: 'medium', dur: 0.4, use: 'demo → payoff card (same mood, new layer); blur ≤ 15 px, dur ≤ 0.5 s.' },
@@ -354,11 +366,31 @@
     'noise-dissolve':  { kind: 'canvas', energy: 'calm',   dur: 0.7, use: 'between two RECREATED cards (never footage → footage).' },
     'cross-warp':      { kind: 'canvas', energy: 'medium', dur: 0.5, use: 'between two RECREATED cards when one should "become" the other.' }
   };
+  const SEAM_GL = { 'flash-white': 'flashWhite', 'blur-dissolve': 'warpDissolve', 'iris': 'iris', 'chromatic-split': 'chromaSplit', 'noise-dissolve': 'warpDissolve', 'cross-warp': 'crossWarp' };
+  const warned = {};
+  function warnOnce(kind, how) { if (warned[kind]) return; warned[kind] = true; if (typeof console !== 'undefined' && console.warn) console.warn('VFX.seam("' + kind + '") is retired in v5: ' + how); }
+  const glReady = o => !!(root.GL && o && o.gl && typeof o.from === 'function' && typeof o.to === 'function');
+  /* one GL.cutTransition per (ctx, kind, t0, dur): registered on first use, reused on every later frame */
+  function glCut(kind, t0, dur, o) {
+    const ctx = o.gl, key = kind + '@' + (+t0).toFixed(4) + '/' + (+dur).toFixed(4);
+    ctx.__vfxCuts = ctx.__vfxCuts || {};
+    if (!ctx.__vfxCuts[key]) ctx.__vfxCuts[key] = root.GL.cutTransition(ctx, { at: t0, dur, name: SEAM_GL[kind], from: o.from, to: o.to, params: o.params, ease: o.glEase || 'inOut', passes: o.passes });
+    return ctx.__vfxCuts[key];
+  }
   /* seam(kind, t, t0, dur, o) → {u, active, from, to, overlay, ring} style objects (CSS kinds), or {u, active,
-     canvas:true} for the canvas kinds (then call drawSeam). u is power2.inOut of (t-t0)/dur. */
+     canvas:true} for the canvas kinds (then call drawSeam). u is power2.inOut of (t-t0)/dur.
+     With {gl, from, to} in o and GL loaded: → {u, active, gl: handle} and empty style objects (applySeam is a no-op);
+     the GL twin has painted the window on its own canvas. */
   function seam(kind, t, t0, dur, o) {
     o = o || {}; const S = SEAMS[kind]; if (!S) throw new Error('VFX.seam: unknown kind ' + kind);
-    dur = dur || S.dur; let x = clamp((t - t0) / Math.max(1e-6, dur), 0, 1); if (x > 1 - 1e-6) x = 1; if (x < 1e-6) x = 0;   // float-safe ends
+    dur = dur || S.dur;
+    if (glReady(o)) {
+      warnOnce(kind, 'drawn by GL.' + SEAM_GL[kind] + ' (lib/shaders.js) inside its window');
+      const h = glCut(kind, t0, dur, o), g = h(t);
+      return { kind, u: g.u, active: g.active, gl: h, from: {}, to: {}, overlay: { opacity: '0' }, ring: { opacity: '0' } };
+    }
+    if (root.GL) warnOnce(kind, 'pass {gl, from, to} to hand this cut to GL.' + SEAM_GL[kind] + '; drawing the 2D approximation for now');
+    let x = clamp((t - t0) / Math.max(1e-6, dur), 0, 1); if (x > 1 - 1e-6) x = 1; if (x < 1e-6) x = 0;   // float-safe ends
     const u = (o.ease || EIO2)(x), active = t >= t0 && t < t0 + dur;
     const r = { kind, u, active, from: {}, to: {}, overlay: { opacity: '0' }, ring: { opacity: '0' } };
     if (S.kind === 'canvas') { r.canvas = true; return r; }
@@ -408,10 +440,22 @@
      exactly, u=1 draws toImg exactly.
        chromatic-split  from split by 0.06*u, to split by 0.06*(1-u), mixed by u
        noise-dissolve   to shown where smoothstep(0.4,0.6, fbm + 1.2u - 0.6) (5-octave quintic fBm, 160x90 tile)
-       cross-warp       rows of from drift +0.5*u*disp, rows of to drift -0.5*(1-u)*disp, blended by the same noise */
+       cross-warp       rows of from drift +0.5*u*disp, rows of to drift -0.5*(1-u)*disp, blended by the same noise
+     With o.gl (a GL.create context) and GL loaded: the ends stay the pictures themselves on ctx; in between the GL
+     twin paints its own canvas (GL.transition) and ctx is cleared — one owner per frame, no double image. */
   function drawSeam(kind, ctx, fromImg, toImg, u, o) {
     o = o || {}; assertRecreated(ctx, 'drawSeam'); u = clamp(u, 0, 1);
     const W = o.W || ctx.canvas.width, H = o.H || ctx.canvas.height;
+    if (root.GL && o.gl && SEAM_GL[kind]) {
+      warnOnce(kind, 'drawn by GL.' + SEAM_GL[kind] + ' (lib/shaders.js)');
+      const mid = u > 0 && u < 1, GL = root.GL;
+      ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
+      if (!mid) ctx.drawImage(u <= 0 ? fromImg : toImg, 0, 0, W, H);
+      ctx.restore();
+      if (mid) GL.transition(o.gl, SEAM_GL[kind], GL.texture(o.gl, fromImg), GL.texture(o.gl, toImg), u, o.params);
+      GL.show(o.gl, mid);
+      return;
+    }
     ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
     if (u <= 0) { ctx.drawImage(fromImg, 0, 0, W, H); ctx.restore(); return; }
     if (u >= 1) { ctx.drawImage(toImg, 0, 0, W, H); ctx.restore(); return; }
@@ -483,9 +527,38 @@
   }
   const ramp = { RMIN, RMAX, CELLS, rateAt, srcTime, timeAt, frameAt, rampTo, table };
 
+  /* ---------- selftest (node, no canvas): the pure parts ---------- */
+  function selftest() {
+    const fails = [], near = (a, b, e) => Math.abs(a - b) <= (e || 1e-9);
+    if (hash(3, 7, 1) !== hash(3, 7, 1) || hash(3, 7, 1) === hash(3, 7, 2) || hash(3, 7, 1) < 0 || hash(3, 7, 1) >= 1) fails.push('lattice hash');
+    const f = fbm(1.3, 2.7, 5), f2 = fbm(1.3, 2.7, 5); if (f !== f2 || f < 0 || f > 1) fails.push('fbm determinism / range');
+    if (grainSeed(0.5, { fps: 30 }) !== 15 || grainSeed(0.5, { fps: 30, step: GRAIN_STEP }) !== 1 || grainSeed(14 / 30, { fps: 30, step: 15 }) !== 0 || grainSeed(29 / 30, { fps: 30, step: 15 }) !== 1) fails.push('grain seed stepping');
+    if (grainSeed(1, { fps: 30, seed: 100 }) !== 130 || grainSeed(1, { fps: 30, step: 0 }) !== 30) fails.push('grain seed offset / step floor');
+    for (const k of Object.keys(SEAMS)) if (!SEAM_GL[k]) fails.push('no GL twin for seam ' + k);
+    const fw0 = seam('flash-white', 10, 10, 0.5), fw1 = seam('flash-white', 10.5, 10, 0.5), fwm = seam('flash-white', 10.25, 10, 0.5);
+    if (fw0.u !== 0 || fw1.u !== 1 || fw1.active || !fwm.active || fwm.overlay.opacity === '0' || fw0.from.opacity !== '1' || fw1.to.opacity !== '1') fails.push('flash-white 2D envelope');
+    if (!seam('cross-warp', 1, 0, 0.5).canvas || seam('iris', 1, 0, 0.6).to.clipPath !== 'none') fails.push('canvas kinds / iris end state');
+    if (seam('blur-dissolve', 0.2, 0, 0.4).from.filter === 'none' || seam('blur-dissolve', 0.4, 0, 0.4).to.filter !== 'none') fails.push('blur-dissolve filters');
+    const W = seamWindows([{ seam: 'iris', at: 3 }, { seam: 'cross-warp', at: 9, dur: 0.3 }]); if (W.length !== 2 || !near(W[0].t1, 3.6) || !near(W[1].t1, 9.3) || !inSeam(3.3, [{ seam: 'iris', at: 3 }]) || inSeam(4, [{ seam: 'iris', at: 3 }])) fails.push('seamWindows / inSeam');
+    if (!near(ramp.srcTime(2, 3), 6) || !near(ramp.srcTime([[0, 2], [4, 2]], 3), 6) || !near(ramp.timeAt([[0, 2], [4, 2]], 6), 3)) fails.push('ramp constant rate');
+    const lane = ramp.rampTo(6, 3, 0.25); if (!lane || !near(ramp.srcTime(lane, 3), 6, 0.01) || !near(ramp.rateAt(lane, 3), 1)) fails.push('rampTo lands at 1x on the word (trapezoid table within 10 ms of the closed form)');
+    if (ramp.rampTo(100, 1) !== null || ramp.frameAt(1, 2, 30, 40) !== 40 || ramp.frameAt(1, 0.5, 30, 40) !== 16) fails.push('rampTo bounds / frameAt clamp');
+    if (!near(sstep(0, 1, 0.5), 0.5) || sstep(0, 1, -1) !== 0 || !near(EIO2(0.5), 0.5)) fails.push('smoothstep / power2.inOut');
+    const vp = vignetteParams({ amount: 0.12 }); if (!near(vp.dark, 0.09) || !near(vp.power, 4.9) || !near(vp.mid, 0.65) || !near(vp.feather, 0.496)) fails.push('vignette params ' + JSON.stringify(vp));
+    if (isFootage(null) || isFootage(42) || FOOTAGE_SELECTOR.indexOf('#clipWrap') < 0) fails.push('footage guard');
+    return { ok: !fails.length, fails, seams: Object.keys(SEAMS).length, gl_twins: SEAM_GL, grain_step: GRAIN_STEP, gl_loaded: !!root.GL };
+  }
+
   root.VFX = { FOOTAGE_SELECTOR, isFootage, assertRecreated, hash, vnoise, fbm, sstep, EIO2,
-               vignette, vignetteParams, vignetteMask, grain, bloom, bloomGhostStyle, applyBloomGhost,
+               vignette, vignetteParams, vignetteMask, grain, grainSeed, GRAIN_STEP, bloom, bloomGhostStyle, applyBloomGhost,
                matteStyle, applyMatte, clearMatte, haze, chromaticSplit, glitch, waveWarp,
-               SEAMS, seam, applySeam, drawSeam, seamWindows, inSeam, ramp, frameIndex };
-  if (typeof module !== 'undefined' && module.exports) module.exports = root.VFX;
+               SEAMS, SEAM_GL, seam, applySeam, drawSeam, seamWindows, inSeam, ramp, frameIndex, selftest };
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = root.VFX;
+    if (require.main === module) {
+      const argv = process.argv.slice(2);
+      if (argv.indexOf('--selftest') >= 0) { const r = selftest(); process.stdout.write(JSON.stringify(r, null, 2) + '\n'); process.exit(r.ok ? 0 : 1); }
+      process.stderr.write('usage: node vfx.js --selftest\n'); process.exit(2);
+    }
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

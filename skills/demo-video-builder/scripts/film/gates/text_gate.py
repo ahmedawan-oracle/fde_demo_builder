@@ -405,7 +405,7 @@ def selftest():
                       '.hl.box{border:2px solid #E56B5E;background:rgba(229,107,94,.08)}'
                       '</style></head><body><div id="stage"><div class="card"><h1 id="tTitle"></h1></div></div>'
                       '<script>const F={title:"Monday, answered.",caption:"Fictional company · synthetic data"};</script></body></html>')
-        dirty_html = clean_html.replace('#stage{background:#082A34}', '#stage{background:linear-gradient(180deg,#082A34,#204A56)}'
+        dirty_html = clean_html.replace('#stage{background:#082A34}', '#stage{background:linear-gradient(180deg,#082A34,#3C8FA8)}'
                                         ).replace('color:#E9F3F9', 'color:#fff').replace('Georgia,serif', 'Inter,sans-serif'
                                         ).replace('</script>', ';const G=(t)=>Math.sin(t*0.35);const L="And every Monday, it takes a day to answer.";</script>')
         shots = "(function(){window.FILM={closeLines:['One notebook.','One question.','One answer the whole team can trust.'],acts:[{label:'THE ANALYST',text:'Build it where the data is.'}]};})();"
@@ -424,8 +424,8 @@ def selftest():
         for n, (okk, d) in res.items():
             print('      %-16s %s  %s' % (n, 'PASS' if okk else 'FAIL', d[:110]))
         t(not res['text budget'][0] and 'double-print' in res['text budget'][1], 'text budget: a narration sentence rendered as text fails')
-        t(not res['design tokens'][0] and '#204A56' in res['design tokens'][1] and 'Inter' in res['design tokens'][1],
-          'design tokens: off-palette #204A56 and an undeclared font fail (#fff passes: design.md declares paper)')
+        t(not res['design tokens'][0] and '#3C8FA8' in res['design tokens'][1] and 'Inter' in res['design tokens'][1],
+          'design tokens: off-palette #3C8FA8 and an undeclared font fail (#fff and #204A56 pass: design.md declares paper + ground2)')
         t(res['lazy defaults'][0] and 'gradient-ground' in res['lazy defaults'][1] and 'banned-font' in res['lazy defaults'][1]
           and 'screensaver-drift' in res['lazy defaults'][1], 'lazy defaults: gradient ground, banned font, clock drift WARN by default')
         strict = dict(base); strict['qa'] = {'css_fail': ['gradient-ground', 'banned-font']}

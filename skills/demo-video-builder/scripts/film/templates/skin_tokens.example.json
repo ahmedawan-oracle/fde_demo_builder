@@ -1,16 +1,29 @@
 {
  "_doc": [
-  "skin_tokens.example.json — brand tokens for a v3 film skin (fictional Acme defaults = the colours film.example.html ships with today).",
-  "A skin is a flat set of typed slots. Every scalar becomes a CSS custom property --<id> on the scene's :root (colour, font,",
-  "number, string); image slots fill [data-var-src]; string slots fill [data-var-text]. The scene's CSS reads var(--paper) etc.",
-  "with these same defaults, so a film without a skin renders exactly as before.",
-  "Precedence (ours, the opposite of HyperFrames): skin file > per-row batch override > the :root values authored in the scene.",
-  "Apply the skin BEFORE the first __seek (render_frames.js forwards ?skin=<relative json> on the scene URL; film.json \"skin\" names it).",
+  "skin_tokens.example.json — brand tokens for a film skin (fictional Acme defaults = the colours film.example.html ships with today).",
+  "A skin is a flat set of typed slots plus the v5 sections (type, motion, captions, seams, when_to_use) — ten complete ones live in",
+  "skins/ (skins/README.md); tools/brand_kit.py extracts or composes a new one and draws its style sheet; `brand_kit.py check` gates it.",
+  "HOW A SCENE APPLIES THE TOKENS (one flag): film.json \"skin\": \"skins/<name>.json\" -> build_film.py step 0 runs",
+  "  python tools/skin_apply.py skins/<name>.json   ->  scenes/skin_data.js  (+ design.md tokens rewritten from the skin)",
+  "scenes/skin_data.js is a plain local script: it sets window.SKIN = <this document> and, synchronously at load, every style/layout",
+  "token as a CSS custom property on document.documentElement — colour and font slots -> `--<id>: <value>`, number slots ->",
+  "`--<id>: <value><unit>`, enum slots -> `--<id>` plus a data-skin-<id> attribute on <html>; data-skin=\"<name>\" names the look.",
+  "The scene includes it ONCE, right after its <style> block and before any script that measures layout:",
+  "    <script src=\"skin_data.js\"></script>",
+  "Its CSS already reads var(--paper), var(--ink), var(--accent), var(--black) … with these defaults on :root, so a film without a",
+  "skin renders exactly as before, and a skinned film is re-coloured before the first __seek. Content slots (title, subtitle,",
+  "caption, logo) are NOT pushed into the DOM automatically: SKIN.bind(document) fills only EMPTY bound elements (`binds`), so",
+  "authored FILM.* copy always wins; shots.js may read SKIN.motion.* and SKIN.captions.style as its defaults (guidance, never the clock).",
+  "There is no ?skin= query or fetch() path: a file: scene cannot fetch, and a generated local script is what lint_scene.py and the",
+  "determinism canary can see. To preview another look, run skin_apply.py again with another skin (studio hot-reloads the scene).",
+  "HEAD FADE: the scene's #black plate is `background: var(--black)`; light skins set black = paper (brand_kit does this for every",
+  "light ground), so a light film opens from its own paper, never a dark flash. build_film.py compares frame 0 with the plate;",
+  "tools/export.py dips the booth loop to the same token. Precedence: skin file > the :root values authored in the scene.",
   "What can NEVER be a token: the narration text (it is the clock), fps, 1920x1080, the total length, the codec, and the mandatory",
   "FDE Demo Builder credit (credit.py picks its own colour from the end screen). `portrays` tags mark identity slots: subject_* must",
   "stay fictional in examples, host_identity (the depicted product's own UI) is never repainted.",
   "Prove a re-skin differentially: render one still with the skin and one with a probe skin (paper/ink inverted); > 5 % of 160x90",
-  "grey pixels must differ, else the binding never reached the DOM."
+  "grey pixels must differ, else the binding never reached the DOM (tools/skin_apply.py --selftest checks the loader in a DOM stub)."
  ],
  "name": "acme-night",
  "tokens": {
@@ -41,7 +54,8 @@
    "audio master is reused unless a row changes bed_db. Output template keys: {name}, {index} and any string/number/boolean",
    "row key; a missing placeholder or two rows mapping to one output is an error. Rows that try to set a forbidden token",
    "(narration, fps, size, total, codec, credit) are refused. Every output still passes qa_film.py and the CREDIT gate.",
-   "build_film.py --batch rows.json --output \"out/{name}.mp4\" writes out/batch_manifest.json {row, skin, output, duration, qa, credit}."
+   "PLANNED (not in build_film.py yet): build_film.py --batch rows.json --output \"out/{name}.mp4\" writing out/batch_manifest.json.",
+   "Today: one skin per build — write a skin per row (tools/brand_kit.py compose), point film.json \"skin\" at it and build again."
   ],
   "rows_example": [
    {"name": "Acme_Monday_Film_night", "tokens": {}},

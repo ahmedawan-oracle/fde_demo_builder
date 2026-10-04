@@ -51,6 +51,8 @@
   "psnr": 40
  },
  "motion": {
+  "allow_doc": "the Send click: the cursor's click ring lands on the control and the spotlight releases between the cut and the pull-out (SEND .. SEND + 0.55); the real footage holds its first frame until SEND + 0.45, so this is the only recreated motion in that window",
+  "allow": [[26.55, 27.15]],
   "mask": [
    [
     0,

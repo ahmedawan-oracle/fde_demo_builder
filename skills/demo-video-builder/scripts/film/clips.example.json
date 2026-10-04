@@ -8,5 +8,8 @@
   "fix": []},
  {"name": "q", "kind": "still", "shows": "the composer holding the typed question (median: no pointer)",
   "win": [14.6, 15.1], "n": 3, "crop": [0, 0, 1920, 1080]},
- {"name": "send", "kind": "seq", "shows": "REAL: the send", "t0": 15.05, "t1": 16.0, "crop": [0, 0, 1920, 1080]}
+ {"name": "send", "kind": "seq", "shows": "REAL: the send, the question lifting into its bubble, the answer card arriving",
+  "t0": 15.05, "t1": 16.8, "crop": [0, 0, 1920, 1080]},
+ {"name": "answer", "kind": "still", "shows": "the answer card holding its one figure (median of the settled frames)",
+  "win": [17.4, 18.0], "n": 3, "crop": [0, 0, 1920, 1080]}
 ]

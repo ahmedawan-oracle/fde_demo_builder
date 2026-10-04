@@ -92,15 +92,21 @@ One beat per idea: `## Beat NN — Name (t0–t1, ~dur s)` in absolute seconds, 
 `phase` (vo_script phase), `real: recorded|recreated|placeholder`, `clip` (recorded), `voice`, `vo` (verbatim, or
 `silent`), `verbatim: yes` (the typed question), `screen` with **every rendered word in quotes**, `hero_prop`,
 `callback: NN`, `motion` (VERB + ease + duration — SLAMS / SLIDES / DRAWS / COUNTS / TYPES / RISES / HOLDS …; an
-element without a verb is not designed), `camera` (establish → push → hold), `push: [x, y, w, h]` (source px, drawn
-on the sheet), `act`, `seam` (one direction rule for the whole film), `caption`, `constraint` (one explicit "no …"),
-`why`, `type`, `persuasion`, `beat`, `breather: yes` (exactly one), `sketch:` (an image for the sheet).
+element without a verb is not designed), **`start:` and `end:`** (the first and the last frame in one sentence each —
+`end:` mandatory on recreated beats, it is the frame the next cut lands on; → `storyboard-start-end.md`), **`hold:`**
+(recreated beats: the fraction after which only the background may move, 0.3–0.95, or `none (reason)` as a written
+waiver; never on a footage match-cut; → `hold-doctrine.md`), `camera` (establish → push → hold), `push: [x, y, w, h]`
+(source px, drawn on the sheet), `act`, `seam` (one direction rule for the whole film), `caption`, `constraint` (one
+explicit "no …"), `why`, `type`, `persuasion`, `beat`, `breather: yes` (exactly one), `sketch:` (an image for the sheet).
 
 `check` fails on: broken arithmetic (gaps, sums ≠ duration ± 10 %, > 10 % drift against
 `vo/<name>_phases.json`), a phase without a beat or a beat without a phase, missing `why/constraint/screen/seam/vo`,
-a recreated beat without a verb, a recorded beat without a clip in `clips.json`, a placeholder at `--build` (unless
+a recreated beat without a verb, a recreated beat without `end:` at `--build`, an END frame unapproved at `--build`
+once `out/review/approvals.json` exists (`--require-approvals` / `--no-require-approvals`), a `hold:` outside
+0.3–0.95 or on a footage match-cut, a recorded beat without a clip in `clips.json`, a placeholder at `--build` (unless
 the brief allows it), a dangling or forward callback, zero or two breathers, a hero prop quoted differently, hook
-vocabulary, a version/lock mismatch, and > 3.4 words/s in any beat. It warns on pace outside 1.8–3.0 w/s, > 24
+vocabulary, a version/lock mismatch, and > 3.4 words/s in any beat. It warns on a missing `start:`, a missing `end:`
+before the build, a two-sentence frame line, a recreated beat with no `hold:` line, It warns on pace outside 1.8–3.0 w/s, > 24
 words, recreated beats outside 1.5–9 s, product beats outside 4–20 s, more than 4 on-screen strings at once, a
 string > 9 words or a narration sentence on screen, lazy verbs (FLOATS/DRIFTS/BREATHES), and TTS spelling
 (digits, %, $, 10x, 135+, acronyms, domains — the voice rounds, the screen keeps the exact figure):
@@ -118,8 +124,10 @@ arc, the Changes / Still open / Locked notes), a three-column grid of 16:9 cells
 scales like the build) grouped under act bars, each cell drawing the beat's quoted words in the design tokens
 (fit-to-measure: ≤ 3 words h1, 4–6 h2, 7+ h3), a REAL / RECREATED / PLACEHOLDER badge, the 83 % keep-out guide,
 the establish → push frame for recorded beats, the label row `NN · NAME` / `phase · t0–t1`, a bold lead on what
-moves first, seam and caption chips; two closing cells (seam map, tokens). No scripts, no external assets; opens
-from `file://`. `--truth` pulls a frame per beat midpoint from the finished film and re-reads durations from the
+moves first, the START / END sentences, seam and caption chips; two closing cells (seam map, tokens). No scripts,
+no external assets; opens from `file://`. `--mobile` lays the same sheet out for a phone: one column under 480 px,
+larger type, a tap on a frame zooms it edge to edge (CSS focus, still no scripts) — every comment made there is a
+free change. `--truth` pulls a frame per beat midpoint from the finished film and re-reads durations from the
 clock. The sheet is generated, never hand-edited — it is not a second source of timing truth.
 
 ## 6. Direction block, design spec and the text gate
@@ -130,7 +138,8 @@ never a third hue; the brand accent only on the single focal element (15–25 % 
 word, spread over the back ~50 % of the beat, never front-loaded in the first ~25 % (the slideshow). **Holds**: a
 held read beats bad motion; no breathing loops, glow drift or back-half pushes (the screensaver); subtle jitter is
 the only sanctioned aliveness; exactly one breather per film. **Keep-out**: nothing authored in the bottom 17 %
-except the credit. **Type** (1280×720 stage, ×1.5 at 1080p): headlines ≥ 40, body ≥ 14, labels ≥ 11 stage px;
+except the credit. **Type** (1280×720 stage, ×1.5 at 1080p): headlines ≥ 40, body ≥ 18, labels ≥ 16 stage px
+(24 px at 1080p — the one legibility floor; `design.md → scale` and `text_gate` carry the same numbers);
 in-feed ×1.5 again; display tracking −0.03…−0.05 em; light-on-dark body weight 350, line-height +0.05–0.1;
 tabular-nums where digits stack; a 5–7-word line gets 2–2.5 s; 3 s on screen must read in 2. **Pace**: ~2.5 words/s
 (15 s ≈ 37 words, 30 s ≈ 75, 60 s ≈ 150); 1–2 sentences, 6–20 words per beat; on-screen text is a hero word, a stat,
@@ -147,7 +156,7 @@ real product, never from memory. `gates/text_gate.py` (five gates, auto-loaded b
 | narration pace | any phase > 3.4 w/s | outside 1.8–3.0 w/s; > 24 words | no phases.json / vo_script.py |
 | brief message | < 60 % of the message's content words in narration + authored text; honesty line not spoken | — | no BRIEF.md |
 | design tokens | a hex/rgb(a) literal off the palette; an undeclared font-family | radii/shadows off spec; type under `scale.justify_below` | no design.md |
-| lazy defaults | rows listed in `qa.json css_fail` | gradient ground, gradient text, pure #000/#fff, > 2 left stripes, banned fonts, bouncy eases, clock-driven drift, opacity < 10 %, type < 11 px | — |
+| lazy defaults | rows listed in `qa.json css_fail` | gradient ground, gradient text, pure #000/#fff, > 2 left stripes, banned fonts, bouncy eases, clock-driven drift, opacity < 10 %, type < 16 stage px | — |
 
 Only authored CSS/JS is scanned — product footage keeps its own palette and is never graded here.
 

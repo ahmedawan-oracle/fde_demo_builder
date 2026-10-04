@@ -1,0 +1,71 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>blocks2 demo — four BL2 story blocks on a 10 s clock (fictional Acme)</title>
+<!--
+  scenes_blocks2_demo.html — a stand-alone example of lib/blocks2.js (BL2, GSAP on the film clock via lib/motion.js).
+    0.0 … 3.4   BL2.countUp        "29 % → <1 %": the first figure counts (sine.inOut) and lands at 2.0, the arrow draws,
+                                   the second figure lands at 2.9 (the moment a narrator would say "under one percent")
+    3.4         BL2.flash          the editorial hand-off: white 0.55 → 0 over 0.28 s, the world snaps 2 %
+    3.4 … 7.2   BL2.decisionCard   the JSON-like decision types in 0.9 s behind a caret, the seal hits at 4.9
+    5.9 … 7.2   BL2.receipt        "grounded in the ontology · 21 tools · 14 tables · 0 writes" lands with the 2 % snap
+    7.2 … 10    BL2.chatReveal     a typed question (55–90 c/s word chunks) → thinking dots → streamed answer, last word at 9.6
+  No timing file: in a real film every land/start below is a wt(phase, word) from lib/timeline.js, e.g.
+  BL2.countUp(host, {…}).land(wt('open', 'percent')). Scene contract as film.example.html (?render, __seek/__step/__total,
+  body.pre); frame(t) is one line: MOTION.seek(t). gsap is loaded from the project's node_modules (npm i gsap), never a CDN.
+  Everything here is fictional ("Acme", synthetic numbers). The mandatory FDE Demo Builder credit is stamped by
+  build_film.py on the final video, not drawn here.
+-->
+<style>
+@font-face{font-family:'Georgia';src:local('Georgia')}
+@font-face{font-family:'Arial';src:local('Arial')}
+@font-face{font-family:'Consolas';src:local('Consolas')}
+html,body{margin:0;background:#082A34;overflow:hidden;width:1280px;height:720px;font-family:Arial,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+body.pre #stage{visibility:hidden}
+#stage{position:absolute;inset:0;overflow:hidden;background:linear-gradient(180deg,#082A34,#204A56)}
+#world{position:absolute;inset:0;transform-origin:50% 50%}
+#countHost{position:absolute;left:160px;top:236px}
+#cardHost{position:absolute;left:160px;top:150px}
+#receiptHost{position:absolute;left:160px;top:520px}
+#chatHost{position:absolute;left:360px;top:96px}
+#flashHost{position:absolute;inset:0;z-index:60}
+#cap{position:absolute;left:0;right:0;bottom:34px;text-align:center;font:500 13px/1 Arial;letter-spacing:.12em;text-transform:uppercase;color:#81A9AB}
+</style></head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="countHost"></div>
+    <div id="cardHost"></div>
+    <div id="receiptHost"></div>
+    <div id="chatHost"></div>
+  </div>
+  <div id="flashHost"></div>
+  <div id="cap">Fictional company · synthetic data</div>
+</div>
+<script src="../node_modules/gsap/dist/gsap.min.js"></script>
+<script src="lib/motion.js"></script>
+<script src="lib/blocks2.js"></script>
+<script>
+'use strict';
+const RENDER = /[?&]render/.test(location.search);
+if (RENDER) document.body.classList.add('pre');
+const END = 10.0, $ = s => document.querySelector(s);
+
+/* --- build once: DOM + GSAP timelines mounted on the clock (MOTION.block inside every builder) ------------------ */
+const count = BL2.countUp($('#countHost'), { id: 'count', land: 2.9, end: 3.4, value: 29, suffix: ' %', label: 'Manual reconciliation · per quarter',
+  then: { token: '<1', suffix: ' %', gap: 0.4 }, sub: 'after the Acme agent took the night shift' });
+const flash = BL2.flash($('#flashHost'), { id: 'flash', at: 3.4, snapEl: $('#world') });
+const card = BL2.decisionCard($('#cardHost'), { id: 'decision', land: 4.9, end: 7.2, exit: 'none', title: 'decision · acme-northfield',
+  fields: { decision: 'hold', rv: 0.82, confidence: 'high', escalate: false, receipt: 'rcpt_7f3a' } });
+const receipt = BL2.receipt($('#receiptHost'), { id: 'receipt', land: 5.9, end: 7.2 });
+const chat = BL2.chatReveal($('#chatHost'), { id: 'chat', start: 7.2, end: END, send: 1.7, answerEnd: 2.4,
+  question: 'Why hold the Northfield line?', answer: ['One unverified step in the ownership chain. Everything else clears.'], receipt: 'grounded · 21 tools · 0 writes' });
+window.__sync = [].concat(count.sync(), flash.sync(), card.sync(), receipt.sync(), chat.sync());
+
+/* --- one pure frame(t): every block is a GSAP timeline the clock drives --------------------------------------- */
+function frame(t) { MOTION.seek(t); }
+let t0 = null;
+function loop(now) { if (t0 === null) t0 = now; const t = (now - t0) / 1000; frame(t); if (!RENDER && t > END + 1) t0 = now; requestAnimationFrame(loop); }
+window.__seek = t => { document.body.classList.remove('pre'); frame(t); frame(t); };
+window.__step = t => frame(t);
+window.__total = END;
+if (!RENDER) { const q = new URLSearchParams(location.search); if (q.has('t')) window.__seek(parseFloat(q.get('t'))); else requestAnimationFrame(loop); }
+</script></body></html>

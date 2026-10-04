@@ -1,0 +1,210 @@
+{
+ "name": "mint-ledger",
+ "label": "Mint Ledger",
+ "when_to_use": "Data, ledger and audit-trail demos: pale mint ground, mono typewriter captions, calm pace that lets figures be read.",
+ "background": "light",
+ "mood": "technical",
+ "tokens": {
+  "paper": {
+   "type": "color",
+   "default": "#EAF4F1",
+   "role": "style",
+   "description": "stage background (top of the gradient)"
+  },
+  "paper2": {
+   "type": "color",
+   "default": "#D8E7E2",
+   "role": "style",
+   "description": "stage background (bottom of the gradient)"
+  },
+  "ink": {
+   "type": "color",
+   "default": "#0F2E2A",
+   "role": "style",
+   "description": "title and lower-third text"
+  },
+  "ink-soft": {
+   "type": "color",
+   "default": "#415751",
+   "role": "style",
+   "description": "subtitle text"
+  },
+  "muted": {
+   "type": "color",
+   "default": "#56736B",
+   "role": "style",
+   "description": "caption line, lower-third label, glow"
+  },
+  "accent": {
+   "type": "color",
+   "default": "#0F7A6A",
+   "role": "style",
+   "description": "rule, highlight boxes, lower-third edge — one focal element per beat"
+  },
+  "gold": {
+   "type": "color",
+   "default": "#9A6B00",
+   "role": "style",
+   "description": "first line of the closing card"
+  },
+  "black": {
+   "type": "color",
+   "default": "#EAF4F1",
+   "role": "style",
+   "description": "head fade plate"
+  },
+  "title-font": {
+   "type": "font",
+   "default": "Bahnschrift, \"Segoe UI\", sans-serif",
+   "role": "style",
+   "description": "title + closing card face (local system family)"
+  },
+  "body-font": {
+   "type": "font",
+   "default": "\"Segoe UI\", Arial, sans-serif",
+   "role": "style",
+   "description": "subtitles, captions, lower-thirds"
+  },
+  "title-size": {
+   "type": "number",
+   "default": 64,
+   "min": 44,
+   "max": 84,
+   "step": 2,
+   "unit": "px",
+   "role": "layout",
+   "description": "title h1 size on the 1280x720 stage"
+  },
+  "title": {
+   "type": "string",
+   "default": "Monday, answered.",
+   "role": "content",
+   "portrays": [
+    "subject_tagline"
+   ],
+   "binds": "#tTitle"
+  },
+  "subtitle": {
+   "type": "string",
+   "default": "From an analyst’s notebook to a question anyone can ask",
+   "role": "content",
+   "portrays": [
+    "subject_tagline"
+   ],
+   "binds": "#tSub"
+  },
+  "caption": {
+   "type": "string",
+   "default": "Fictional company · synthetic data",
+   "role": "content",
+   "portrays": [
+    "authority_badge"
+   ],
+   "binds": "#tCap",
+   "description": "the honesty line; keep it unless the film shows a real customer’s own data with their approval"
+  },
+  "logo": {
+   "type": "image",
+   "default": null,
+   "role": "content",
+   "portrays": [
+    "subject_logo"
+   ],
+   "binds": "#logo",
+   "description": "local file inside the project (assets/…); null hides the slot"
+  },
+  "density": {
+   "type": "enum",
+   "default": "booth",
+   "options": [
+    "booth",
+    "desk"
+   ],
+   "role": "layout",
+   "description": "booth = larger type, fewer words on screen"
+  }
+ },
+ "forbidden_tokens": [
+  "narration",
+  "fps",
+  "width",
+  "height",
+  "total",
+  "codec",
+  "credit"
+ ],
+ "css_snippet": ":root{--paper:#EAF4F1;--paper2:#D8E7E2;--ink:#0F2E2A;--ink-soft:#415751;--muted:#56736B;--accent:#0F7A6A;--gold:#9A6B00;--black:#EAF4F1;--title-font:Bahnschrift, \"Segoe UI\", sans-serif;--body-font:\"Segoe UI\", Arial, sans-serif;--title-size:64px}",
+ "type": {
+  "mood": "technical",
+  "display": "Bahnschrift",
+  "body": "Segoe UI",
+  "mono": "Consolas",
+  "display_weight": 600,
+  "display_file": "bahnschrift.ttf",
+  "body_file": "segoeui.ttf",
+  "body_bold_file": "segoeuib.ttf",
+  "mono_file": "consola.ttf",
+  "title_css": "Bahnschrift, \"Segoe UI\", sans-serif",
+  "body_css": "\"Segoe UI\", Arial, sans-serif",
+  "mono_css": "Consolas, \"Courier New\", monospace",
+  "sizes_stage_px": {
+   "title": 64,
+   "subtitle": 22,
+   "body": 22,
+   "label": 13,
+   "mono": 18
+  }
+ },
+ "motion": {
+  "profile": "calm",
+  "enter_s": 0.6,
+  "exit_s": 0.45,
+  "stagger_total_s": 0.5,
+  "per_item_s": 0.08,
+  "push_s": 1.4,
+  "push_scale": [
+   1.3,
+   1.6
+  ],
+  "hold_s": 2.5,
+  "first_motion_s": 0.2,
+  "offset_after_cut_s": 0.3,
+  "rack_focus_min_gap_s": null,
+  "eases": {
+   "enter": "power4.out",
+   "exit": "sine.in",
+   "push": "sine.out",
+   "pan": "sine.inOut"
+  }
+ },
+ "captions": {
+  "style": "typewriter",
+  "ink": "dark"
+ },
+ "seams": {
+  "current": "x-1",
+  "allowed": [
+   "cut-the-curve",
+   "inverse zoom-through"
+  ],
+  "max_techniques": 3
+ },
+ "brand": {
+  "source": "composed from hand-picked colours",
+  "given": {
+   "paper": "#EAF4F1",
+   "ink": "#0F2E2A",
+   "accent": "#0F7A6A",
+   "gold": "#9A6B00"
+  }
+ },
+ "contrast": {
+  "ink": 12.95,
+  "ink-soft": 6.91,
+  "muted": 4.61,
+  "accent": 4.66,
+  "gold": 4.18,
+  "paper2": 1.14
+ },
+ "generated_by": "tools/brand_kit.py (deterministic: same inputs → identical file)"
+}

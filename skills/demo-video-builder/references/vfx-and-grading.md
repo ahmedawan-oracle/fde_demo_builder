@@ -1,4 +1,4 @@
-# VFX and grading: where it is honest, and where it is not (v4)
+# VFX and grading: where it is honest, and where it is not (v5)
 
 Two layers live in every v3/v4 film. The **footage lane** (`#clipWrap`: stills, pages, seqs from the
 recording) is evidence: the product as it was. The **recreated layers** (title, cold open, payoff and
@@ -70,24 +70,13 @@ All functions are pure in `t` + explicit state; seeds are `Math.round(t·fps)`; 
 | `VFX.glitch(ctx, img, t, t0, dur, {seed})` | envelope u(1−u)·4, 60 bands, tear 0.18, RGB split 0.035, 8 levels mixed at 0.5 near peak | the problem beat: once per film, ≤ 0.4 s, recreated card only |
 | `VFX.waveWarp(ctx, img, t, {height:10, width:40, speed:1, t0, dur})` | sine only, transparent edges | same rules as glitch |
 
-**Seams** — `VFX.seam(kind, t, t0, dur, o)` returns per-layer styles (`applySeam(layers, st)` sets
-them); the canvas kinds draw with `VFX.drawSeam(kind, ctx, from, to, u)`. Progress is power2.inOut.
-
-| Seam | Dur | Where | What |
-|---|---|---|---|
-| `flash-white` | 0.5 | cold open → first real screen; payoff → close | overlay → white over u 0–0.45, back from 0.5; layers swap at 0.5 |
-| `blur-dissolve` | 0.4 | demo → payoff card | from: blur 0→15 px, scale 1→1.05, out; to: 15→0, 0.95→1, in. Cap 15 px (30 px ≈ 20 ms/frame) |
-| `iris` | 0.6 | title card → the product | `clip-path: circle(1.2·u·H px)` + a ring glowing u(1−u)·4·0.6 |
-| `chromatic-split` | 0.25 | problem beat, recreated only | R/B scaled apart by 0.06·u (from) and 0.06·(1−u) (to) |
-| `noise-dissolve` | 0.7 | recreated → recreated | to shown where `smoothstep(.4,.6, fbm + 1.2u − .6)` |
-| `cross-warp` | 0.5 | recreated → recreated ("becomes") | rows drift ±0.5·disp with u, blended by the same noise |
-
-Doctrine: one primary seam plus at most two accents per film; calm 0.5–0.8 s, medium 0.3–0.5 s,
-high 0.15–0.3 s; never fade-out-then-fade-in; the transition *is* the exit. **Never on a footage →
-footage cut** — a dissolve between two product screens implies a continuity that did not happen; UI
-changes stay hard cuts. Declare seams in `shots.js` as `SEAMS = [{seam:'flash-white', at: P.nb,
-dur: .5}]`; `VFX.seamWindows(SEAMS)` gives the windows `export_timeline.js` writes so QA skips cut
-frames inside them (a white frame otherwise trips "blank after cut").
+**Transitions moved to the GL layer (v5).** `lib/vfx.js` keeps the finishing above (vignette, grain, bloom,
+matte, haze, glitch, wave, the speed ramp); picture-to-picture transitions are drawn by `lib/shaders.js` and
+declared as `type: gl` rows in `seams.json` (`gl-transitions.md`). Doctrine unchanged: one primary seam plus at
+most two accents per film; calm 0.5–0.8 s, medium 0.3–0.5 s, high 0.15–0.3 s; never fade-out-then-fade-in; the
+transition *is* the exit. **Never on a footage → footage cut** — a dissolve between two product screens implies
+a continuity that did not happen; UI changes stay hard cuts. A transition may pass over footage only inside its
+declared window and the window is ≤ 0.5 s; the ledger, the lint and `seam_gate` all refuse longer ones.
 
 ## 3. Speed ramps on seq clips — `VFX.ramp` / `grade.py ramp`
 

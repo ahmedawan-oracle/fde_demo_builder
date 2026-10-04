@@ -20,10 +20,10 @@ rejected version's history survives and nothing is ever deleted. `media_index.md
 | `licence` | `{name, url, attribution, commercial_ok}` — `UNKNOWN` until a human fills it in |
 | `added_by`, `date`, `used_in` | who, when (UTC), which deliverables mixed it in |
 
-Measured rules kept from the HyperFrames media-use ledger: append-only / last-wins, `<type>_NNN` ids, 0.1 s
-duration rounding, a lock file with a **15 s stale-steal and 20 s timeout**, malformed lines skipped (never fatal),
-index regenerated after every write. Our addition is the licence block — their ledger recorded provider and
-prompt but kept rights in a separate credits file, which is exactly the gap a booth film cannot afford.
+Ledger rules: append-only / last-wins, `<type>_NNN` ids, 0.1 s duration rounding, a lock file with a **15 s
+stale-steal and 20 s timeout**, malformed lines skipped (never fatal), index regenerated after every write. The
+licence block lives IN the asset's record, never in a separate credits file — rights kept apart from the asset
+are exactly the gap a booth film cannot afford.
 
 ```bash
 python tools/ledger.py adopt                   # walk vo/ broll/ music/ sfx/ assets/ fonts/ images/ + recording.mp4 + vo_<name>.mp3
@@ -132,12 +132,12 @@ and row keys; missing placeholders or output collisions are errors; rows touchin
 picture re-rendered per row, audio master shared unless `bed_db` changes; `out/batch_manifest.json` records
 `{row, skin, output, duration, qa, credit}`; every output still passes `qa_film.py` and the CREDIT gate.
 
-## Not ported (HeyGen-account items and conflicts)
+## Deliberately out of scope
 
-Hosted `publish` / cloud render / deploy templates; media `resolve` providers (bgm/sfx/image/avatar catalogues,
-favicon logo resolver); the global cross-project asset cache (a cross-customer leak by design); telemetry; the
-Studio GUI and `timeline move/trim/split` mutations (our timing is the narration clock); webm-alpha / ProRes / PNG
-sequence / HLS / 4K exports; bundled third-party SFX files. Only the local, licence-carrying discipline is kept.
+No hosted publish, cloud render or deploy templates; no online media catalogues (music, SFX, image, avatar) or
+logo resolvers; no cross-project asset cache (a cross-customer leak by design); no telemetry; no GUI timeline
+mutations (our timing is the narration clock); no webm-alpha / ProRes / PNG-sequence / HLS / 4K exports; no bundled
+third-party SFX files. The ledger is local, and every asset carries its own licence.
 
 ## Self-tests (synthetic fixtures, no renders)
 

@@ -18,13 +18,13 @@ allow_alpha: true          # rgba() of a declared colour counts as on-palette
 type:
   display: { family: "Georgia, serif", weight: 400, px: 64, tracking: "-0.01em", lh: 1.1 }
   sans:    { family: "\"Helvetica Neue\", Arial, sans-serif", weight: 400, px: 22, lh: 1.4 }
-  label:   { family: "Arial, sans-serif", weight: 600, px: 13, tracking: "0.12em", upper: true }
+  label:   { family: "Arial, sans-serif", weight: 600, px: 16, tracking: "0.12em", upper: true }
   mono:    { family: "Consolas, monospace", weight: 400, px: 18 }
 fonts: ["Georgia", "Helvetica Neue", "Arial", "Segoe UI", "Consolas"]
 scale:                     # stage px at 1280×720 (× 1.5 = 1080p): full-screen floor 60 / 20 / 16 px → 40 / 14 / 11 stage px
-  headline_min: 40
-  body_min: 14
-  label_min: 11
+  headline_min: 40         # ONE legibility floor — label 16 / body 18 / headline 40 stage px (24 / 27 / 60 px at 1080p)
+  body_min: 18
+  label_min: 16            # every label, kicker, tick and lower-third role line; 13 stage px was 20 px on a booth screen — too small
   justify_below: 16        # any authored font-size under 16 stage px (24 px at 1080p) needs a reason in a comment
 radii: [0, 4]              # px; nothing rounder on a booth screen
 borders: [2, 3]            # px; 1 px vanishes on video
@@ -33,6 +33,12 @@ keepout: 0.17              # bottom 17 % of the canvas reserved for captions + c
 eases: { push: sine-out, pan: sine-in-out, scroll: cubic-out, reveal: power4-out, exit: sine-in }
 motion: { enter_s: [0.3, 0.6], exit_s: [0.2, 0.35], stagger_total_s: 0.5, first_motion_s: 0.2, offset_after_cut_s: [0.1, 0.3] }
 bans: [gradient-text, left-stripe, pure-bw, gradient-ground, bouncy-ease, banned-font, screensaver-drift, ghost-opacity]
+tones: { black: black, mid: ground2, live: accent, warm: gold }   # the four-tone palette (gates/skin_gate.py `palette tones`): the dark the film rests on, the mid the recreated layers sit in, the LIVE accent that moves (the one hue the eye tracks), the WARM accent that lands once
+looks:                     # one look per SHOT TYPE (gates/look_gate.py): what each kind of shot may never carry, and which elements are of that kind
+  product:   { forbid: [haze, grain, vignette, bloom, blur, filter, blend, recolour, glitch], selectors: ["#clipWrap", "#clipImg", "#camera", "#pageView"] }
+  recreated: { forbid: [glitch], selectors: [".card", "#kpi", "#receipt"] }
+  title:     { forbid: [], selectors: ["#titleCard", "#closeCard"] }
+  people:    { forbid: [glitch, sharpen, chromatic], selectors: [".people"] }
 ---
 
 # Acme booth — design spec for the recreated layers
@@ -52,8 +58,8 @@ the ground hue; nothing is pure #000 or #fff.
 | Role | Stage px | At 1080p | Notes |
 |---|---|---|---|
 | display | 64 (h1, ≤ 3 words) / 44 (h2, 4–6) / 32 (h3, 7+) | 96 / 66 / 48 | tracking −0.03…−0.05 em at display sizes; headline block ≤ 78 % of the width |
-| body | 22 | 33 | light-on-dark: weight 350 instead of 400, line-height +0.05–0.1 |
-| label | 13–16 | 20–24 | uppercase, +0.12 em tracking; legibility floor ≈ 1.4 % of the width (18 stage px) |
+| body | 22 (floor 18) | 33 (27) | light-on-dark: weight 350 instead of 400, line-height +0.05–0.1; chat lines and panel text never under 18 |
+| label | 16–18 | 24–27 | uppercase, +0.12 em tracking; 16 stage px is the legibility floor for every label, kicker and tick — the same number as scale.label_min and typo.js size.label |
 | mono / digits | 18 | 27 | `font-variant-numeric: tabular-nums` wherever digits stack |
 
 Fit to measure: ≤ 3 words → h1, 4–6 → h2, 7+ → h3. Three seconds on screen must be readable in two: fewer

@@ -1,8 +1,15 @@
 {
- "_comment": "Every figure or claim the narration makes, with where it is visible on screen. 'phrase' must appear verbatim in vo_script.py. Anything the screen contradicts or never shows gets dropped from the narration, and logged below.",
+ "_comment": "Every figure or claim the narration makes, with where it is visible on screen. 'phrase' must appear verbatim in vo_script.py. Anything the screen contradicts or never shows gets dropped from the narration, and logged below. v5: 'values' are the only numbers a block or chart may show (CHART.resolve / claim ids), 'figures' are the on-screen rects (source px) a hand-drawn mark may sit on (gates/annotate_gate.py).",
  "claims": [
   { "phrase": "loads the orders, filters the late deliveries, and counts them by region", "source": "notebook Parts 1-3: spark.table / filter / groupBy code and their outputs" },
+  { "phrase": "Three regions are over target", "source": "notebook Part 3 output line 'regions over target: 3'; the assistant's answer card shows the same figure" },
   { "phrase": "Which regions missed their on-time delivery target last week?", "source": "the question as typed in the composer, word for word" }
+ ],
+ "values": {
+  "regions_over_target": { "value": 3, "unit": "", "source": "notebook Part 3 output: 'regions over target: 3' (also the answer card's figure)" }
+ },
+ "figures": [
+  { "id": "regions_over_target", "rect": [548, 460, 36, 47], "clip": "answer", "source": "the assistant's answer card: the figure 3 (source px of recording.mp4)" }
  ],
  "dropped_from_the_original_narration": []
 }

@@ -27,7 +27,7 @@ CLI:
     python gates/overlay_gate.py --measure scenes/film.html       measurement pass only (needs out/timeline.json)
     python gates/overlay_gate.py --probe scenes/film.html         + writes out/caption_luma.json {phase: {mean, p95}}
                                                                   (feed it back: node lib/captions.js … --luma out/caption_luma.json)
-Thresholds are the measured HyperFrames rules re-expressed; see references/captions-and-overlays.md.
+Thresholds are our measured rules; see references/captions-and-overlays.md.
 """
 import json, os, subprocess, sys, tempfile
 
@@ -162,13 +162,19 @@ def _font(name, px):
     return None
 
 
-def check_shape(groups, W, H, max_words=6, max_chars=42, keep_out=4.0, end=None):
+def check_shape(groups, W, H, max_words=6, max_chars=42, keep_out=4.0, end=None, explicit=False):
+    """explicit=True: qa.json states the word and character limits itself — a film that regroups the lane into whole spoken
+    clauses (captions.json grouping) owns its shape, and the measured pixel width (92 % of the box) stays the hard limit.
+    Otherwise qa.json may only tighten a style's own limits, never widen them."""
     fails, warns, durs, prev = [], [], [], None
     for g in groups:
         if g.get('fate') == 'drop':
             continue
         st = STYLE.get(g.get('style', 'anchor'), STYLE['anchor'])
-        mw, mc = min(max_words, st['words']), min(max_chars, st['chars']) if st['chars'] < max_chars else max_chars
+        if explicit:
+            mw, mc = int(max_words), int(max_chars)
+        else:
+            mw, mc = min(max_words, st['words']), min(max_chars, st['chars']) if st['chars'] < max_chars else max_chars
         lines = g.get('lines') or [g.get('text', '')]
         if len(g.get('words', [])) > mw:
             fails.append('%s %d words > %d' % (g['id'], len(g['words']), mw))
@@ -242,7 +248,7 @@ def check_timing(groups, phases, words, srt_cues=None, tol=0.08):
 
 
 def crop_stats(path):
-    """(mean rgb, p95 rgb-by-luma) of a saved lane crop, inset 1 px, <= 12x6 grid like the HyperFrames contrast audit."""
+    """(mean rgb, p95 rgb-by-luma) of a saved lane crop, inset 1 px, sampled on a <= 12x6 grid."""
     from PIL import Image
     im = Image.open(path).convert('RGB')
     w, h = im.size
@@ -330,7 +336,11 @@ const MEASURE = (W, H) => {
   return out;
 };
 (async () => {
-  const b = await puppeteer.launch({ headless: 'new', executablePath: chromePath(), args: ['--no-sandbox', '--hide-scrollbars', '--font-render-hinting=none', '--disable-lcd-text'] });
+  // same Chrome switches as render_frames.js: file: images may feed GL textures (a GL.cutTransition window otherwise throws a
+  // cross-origin texImage2D error and the whole measure pass dies) and the software rasteriser keeps the boxes machine-independent
+  const glArgs = process.env.RENDER_GL === 'hardware' ? [] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu'];
+  const b = await puppeteer.launch({ headless: 'new', executablePath: chromePath(),
+    args: ['--no-sandbox', '--hide-scrollbars', '--font-render-hinting=none', '--disable-lcd-text', '--allow-file-access-from-files'].concat(glArgs) });
   const res = { W: T.W, H: T.H, samples: [], windows: [], crops: {}, hasCap: false };
   const p = await open(b, '');
   let first = true;
@@ -431,7 +441,8 @@ def run(ctx):
     if gdoc is None:
         res += [(n, True, 'no caption lane (out/caption_groups.json absent)') for n in GATE_NAMES[1:4]]
     else:
-        f, w = check_shape(groups, W, H, int(qa.get('caption_max_words', 6)), int(qa.get('caption_max_chars_per_line', 42)), keep_out, gdoc.get('end'))
+        f, w = check_shape(groups, W, H, int(qa.get('caption_max_words', 6)), int(qa.get('caption_max_chars_per_line', 42)), keep_out, gdoc.get('end'),
+                           explicit=('caption_max_words' in qa and 'caption_max_chars_per_line' in qa))
         shown = len([g for g in groups if g.get('fate') != 'drop'])
         res.append((GATE_NAMES[1], not f, f[:3] if f else '%d groups shown%s' % (shown, '; warn %s' % w[:2] if w else '')))
         srt = ctx.get('srt')

@@ -18,9 +18,16 @@
 
    Honesty: blocks are for RECREATED cards, call-outs and openers. Never fake the product UI inside the demo
    act; a block may overlay real footage only where the catalog row says so (references/blocks-catalog.md).
-   Measured numbers: references/blocks-catalog.md. Fictional content only ("Acme"). */
+   Measured numbers: references/blocks-catalog.md. Fictional content only ("Acme").
+
+   v5 — one framework, not two generations. When lib/motion.js is on the page with lib/blocks2.js (BL2) and/or
+   lib/typo.js (TYPO), the blocks v5 rebuilt on GSAP draw behind their v4 signature: BL.kpi → BL2.countUp,
+   BL.titleLockup → TYPO.lockup, BL.flash → BL2.flash, and the new BL.decisionCard / BL.receipt → BL2. Same build /
+   draw / calc shape, same measured numbers. Without the v5 libs every block draws exactly as it did in v4.
+   Node: node lib/blocks.js --selftest  (the pure laws: env, rows, flash, kpi, typing schedules; exit 0 ok / 1 fails) */
 (function (root) {
   'use strict';
+  const GLOBAL = root;                 // builders below shadow `root` with their own root element
 
   /* ============================================================ laws ============================================ */
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -129,6 +136,33 @@
   const TOK = { bg: '#082A34', fg: '#E9F3F9', muted: '#81A9AB', accent: '#E56B5E' };
   const collectSync = (...states) => [].concat(...states.map(s => (s && s.sync) || [])).sort((a, b) => a.t - b.t);
 
+  /* ============================================================ v5 delegates ==================================== */
+  /* The v5 libs are optional: detected per call, never required. BL2 / TYPO only count when MOTION is there too.
+     Options the v5 builder has no twin for (kpi fill bars / rings, pulse:false) keep the v4 drawing even when it is. */
+  const V5 = {
+    motion: () => GLOBAL.MOTION || null,
+    bl2: () => (GLOBAL.MOTION && GLOBAL.BL2) || null,
+    typo: () => (GLOBAL.MOTION && GLOBAL.TYPO) || null
+  };
+  /* drive one mounted MOTION block from a v4 draw(state, t): the same arithmetic MOTION.seek(t) performs for that
+     block, so a scene that never calls MOTION.seek still sees it move, and one that does writes the same values twice */
+  function seekBlock(b, t) {
+    if (!b || !b.tl) return;
+    const inWin = t >= b.start && t < b.end, local = clamp(t - b.start, 0, b.tl.totalDuration() || 0);
+    b.tl.totalTime(local, true);
+    if (b.el && b.hide !== false) { const vis = inWin ? 'visible' : 'hidden'; if (b.el.style.visibility !== vis) b.el.style.visibility = vis; }
+  }
+  /* a v4 draw(state, t, win) may re-time a built block per cue: the v5 twin is rebuilt once per distinct window */
+  const winKey = win => (win ? [win.t0, win.t1, win.exit, win.land].map(v => (v === undefined ? '' : v)).join('|') : '');
+  function unmount(st) { const M = V5.motion(); if (st.v5 && st.v5.id && M) M.remove(st.v5.id); if (st.v5 && st.v5.el && st.v5.el.parentNode) st.v5.el.remove(); }
+  function rewindow(st, win, makeState) {
+    const k = winKey(win); if (k === st.v5Key) return;
+    st.v5Key = k; if (!win) return;
+    const host = st.els.root.parentNode, O = Object.assign({}, st.o, win); unmount(st);
+    const ns = makeState(host, O); for (const key in ns) if (key !== 'o' && key !== 'v5Key') st[key] = ns[key];
+  }
+  const blockId = (name, o) => (o.id || ('bl-' + name + '@' + (+(o.t0 || o.land || 0)).toFixed(3)));
+
   /* ============================================================ kpi ============================================= */
   /* BL.kpi — count-up stat with landing pulse, suffix after the value, bar/ring fill on the count's ease.
      opts: {t0, t1?, land?, value, from=0, dec=0, prefix='', suffix='', token?, label?, fill?:{kind:'bar'|'ring', pct},
@@ -137,7 +171,16 @@
      from 0.38 s for `count` = land - t0 - 0.38 (min 0.7 s; 1.72 s when no land) on sine.inOut from a 30 fps table;
      landing pulse scale 1.07 over 0.165 s power3.out, back 0.165 s power2.out; suffix slides in (8 px) over 0.25 s
      after the land; label fades 0.15–0.45 s; fill shares the count's ease and duration. `token` (a raw display
-     string) is shown verbatim once landed — the number must equal the on-screen product figure (claims.json). */
+     string) is shown verbatim once landed — the number must equal the on-screen product figure (claims.json).
+     v5: with lib/blocks2.js loaded the figure is BL2.countUp (same arrive / count / pulse numbers; `land` keys the
+     block when given, else t0); fills and pulse:false stay v4. */
+  const kpiV5 = (o, plan) => Object.assign({ id: blockId('kpi', o), end: o.t1, exit: o.exit, value: +o.value, from: o.from || 0, dec: o.dec || 0, prefix: o.prefix || '', suffix: o.suffix || '', token: o.token, label: o.label, count: plan.count, align: o.align, locale: o.locale, size: o.size },
+    o.land != null ? { land: o.land } : { start: o.t0 || 0 });
+  const kpiDelegates = o => !o.fill && o.pulse !== false;
+  function kpiState(B2, host, o) {
+    const plan = kpi.plan(o), h = B2.countUp(host, kpiV5(o, plan));
+    return { o, plan, els: { root: h.el, label: h.el.querySelector('.b2-count-label'), num: h.el.querySelector('.b2-fig'), suf: null, fill: null, ring: null }, ringLen: 0, v5: h, v5Key: '' };
+  }
   const kpi = {
     IN: 0.38, PULSE: 0.165,
     plan(o) {
@@ -158,9 +201,10 @@
       if (o.pulse !== false && lt >= p.tLand) pulse = lt < p.tLand + kpi.PULSE ? 1 + 0.07 * E.p3o((lt - p.tLand) / kpi.PULSE) : 1.07 - 0.07 * E.p2o((lt - p.tLand - kpi.PULSE) / kpi.PULSE);
       const su = E.p2o(rmp(lt, p.tLand, p.tLand + 0.25));
       return { phase: e.phase, op, y, scale: sIn * pulse, text, countU: cu, fillU: o.fill ? E.sineIO(cu) * (o.fill.pct == null ? 1 : o.fill.pct) : 0,
-        suffixOp: su, suffixX: (1 - su) * 8, labelOp: rmp(lt, 0.15, 0.45), sync: [{ id: 'land', t: o.t0 + p.tLand * e.k }] };
+        suffixOp: su, suffixX: (1 - su) * 8, labelOp: rmp(lt, 0.15, 0.45), sync: st && st.v5 ? st.v5.sync() : [{ id: 'land', t: o.t0 + p.tLand * e.k }] };
     },
     build(host, o) {
+      const B2 = V5.bl2(); if (B2 && kpiDelegates(o)) return kpiState(B2, host, o);   // v5: BL2.countUp behind the v4 signature
       const plan = kpi.plan(o);
       const root = mk('div', 'bl-kpi', host);
       const label = mk('div', 'bl-kpi-label', root, o.label || '');
@@ -175,6 +219,7 @@
       return { o, plan, els: { root, label, num, suf, fill, ring }, ringLen };
     },
     draw(st, t, win) { const O = win ? Object.assign({}, st.o, win) : st.o;
+      if (st.v5) { rewindow(st, win, (h, oo) => kpiState(V5.bl2(), h, oo)); seekBlock(st.v5.block, t); return kpi.calc(t, O, st); }
       const s = kpi.calc(t, O, st), e = st.els;
       setOp(e.root, s.op); setTf(e.root, 'translateY(' + px(s.y) + ') scale(' + s.scale.toFixed(4) + ')');
       setTxt(e.num, s.text); setOp(e.suf, s.suffixOp); setTf(e.suf, 'translateX(' + px(s.suffixX) + ')'); setOp(e.label, s.labelOp);
@@ -470,7 +515,7 @@
      10 interpolated keyframes per period; integer ranks baked per keyframe; a bar's row is solved FROM rank and a
      swap plays over one keyframe interval (periodDur / 10); the axis domain stays continuous with 6 % headroom
      (ticks glide); the overtaking bar is painted in front; the accent has exactly one binary meaning — this bar
-     currently leads — as a flat fill, never a gradient. Method after the HyperFrames registry (Apache-2.0, see NOTICE.md). */
+     currently leads — as a flat fill, never a gradient. */
   const race = {
     K: 10,
     niceStep(x) { const e = Math.pow(10, Math.floor(Math.log10(x))), f = x / e; return e * (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10); },
@@ -731,8 +776,21 @@
     const sweepX = d < 0.04 ? lerp(-12, 8, d / 0.04) : lerp(8, 28, E.p2o((d - 0.04) / 0.3)), sweepOp = d < 0.04 ? 1 : 1 - E.p2o((d - 0.04) / 0.3);
     return { active: true, washOp, coreScale, coreOp, coreRot: -5, sweepX, sweepOp, sync: [{ id: 'flash', t: tHit }] };
   }
-  flash.build = host => { const root = mk('div', 'bl-flash', host, '<div class="bl-flash-wash"></div><div class="bl-flash-core"></div><div class="bl-flash-sweep"></div>'); return { els: { root, wash: root.children[0], core: root.children[1], sweep: root.children[2] } }; };
-  flash.draw = (st, t, tHit) => { const s = flash(t, tHit), e = st.els; e.root.style.display = s.active ? 'block' : 'none'; if (!s.active) return s; setOp(e.wash, s.washOp); setOp(e.core, s.coreOp); setTf(e.core, 'rotate(' + s.coreRot + 'deg) scale(' + s.coreScale.toFixed(3) + ')'); setOp(e.sweep, s.sweepOp); setTf(e.sweep, 'translateX(' + s.sweepX.toFixed(2) + '%) rotate(108deg)'); return s; };
+  /* v5: with lib/blocks2.js loaded the hit is BL2.flash (0.55 wash → 0 over 0.28 s + the 2 % snap on o.snapEl, a dedicated
+     wrapper — never footage). The hit time arrives with draw(), so the v5 block is mounted on the first draw and remounted
+     only when tHit changes. flash.build(host, {snapEl}) — the second argument is new and optional. */
+  flash.build = (host, o) => {
+    o = o || {};
+    if (V5.bl2()) return { host, snapEl: o.snapEl || null, els: { root: host }, v5: null, v5At: null };
+    const root = mk('div', 'bl-flash', host, '<div class="bl-flash-wash"></div><div class="bl-flash-core"></div><div class="bl-flash-sweep"></div>'); return { els: { root, wash: root.children[0], core: root.children[1], sweep: root.children[2] } };
+  };
+  flash.draw = (st, t, tHit) => {
+    if (st.host) {
+      if (st.v5At !== tHit) { unmount(st); st.v5 = V5.bl2().flash(st.host, { id: blockId('flash', { t0: tHit }), at: tHit, snapEl: st.snapEl }); st.v5At = tHit; st.els.root = st.v5.el; }
+      seekBlock(st.v5.block, t); return flash(t, tHit);
+    }
+    const s = flash(t, tHit), e = st.els; e.root.style.display = s.active ? 'block' : 'none'; if (!s.active) return s; setOp(e.wash, s.washOp); setOp(e.core, s.coreOp); setTf(e.core, 'rotate(' + s.coreRot + 'deg) scale(' + s.coreScale.toFixed(3) + ')'); setOp(e.sweep, s.sweepOp); setTf(e.sweep, 'translateX(' + s.sweepX.toFixed(2) + '%) rotate(108deg)'); return s;
+  };
   /* BL.freezeDress(t, {at, rect:[x,y,w,h], badge?, flash=true}) → {outlineOp, badgeOp, flashOp}: dressing SNAPS on at `at`
      (no tween) with one single-exposure flash 0.55 → 0 over 0.28 s (never a strobe). Goes over a real still; mask
      first, dress second. */
@@ -754,14 +812,28 @@
   /* BL.titleLockup — kicker / wordmark / hairline rule / label, IN = 1.80 s, then TRULY still (no drift, no breath).
      opts: {t0, t1?, kicker, wordmark, label, accent, fg='#E9F3F9', bg='#082A34', exit='none'}
      kicker 0–0.45 s; wordmark settles scale 0.96→1 and fades over 0.25–1.10 s power3.out; the rule draws left→right
-     0.90–1.45 s by measured dash; label 1.30–1.80 s. Kicker/label ink = 62 % fg mixed with bg (≥ 4.5:1). */
+     0.90–1.45 s by measured dash; label 1.30–1.80 s. Kicker/label ink = 62 % fg mixed with bg (≥ 4.5:1).
+     v5: with lib/typo.js loaded the lock-up is TYPO.lockup inside a MOTION block (kicker 12 px / 0.4 s → title rise +
+     blur 0.55 s → rule scaleX 0.5 s power4.out → sub 16 px / 0.5 s); wordmark → title, label → sub; `build`
+     'rise'|'center'|'stagger', `fit`, `times` pass through; exit 'fade'|'up' = TYPO.exit 0.5 s before t1. */
+  function lockupState(TY, host, o) {
+    const M = V5.motion(), root = mk('div', 'bl-lockup', host), fg = o.fg || '#E9F3F9', ink = ink62(fg, o.bg || '#082A34');
+    const id = blockId('lockup', o), start = o.t0 || 0, end = o.t1 == null ? Infinity : o.t1, exit = o.exit && o.exit !== 'none' ? 0.5 : 0;
+    let lk = null;
+    const b = M.block(id, (tl, el, api) => {
+      lk = TY.lockup(tl, el, { at: 0, kicker: o.kicker, title: o.wordmark, sub: o.label, accent: o.accent || '#E56B5E', colors: { kicker: ink, title: fg, sub: ink }, build: o.build || 'rise', fit: o.fit, times: o.times, sizes: o.sizes });
+      if (exit && Number.isFinite(api.exitAt)) TY.exit(tl, el, api.exitAt, { dy: o.exit === 'up' ? -18 : 0, dur: 0.5, ease: 'power2.in' });
+    }, { el: root, start, end, exit });
+    return { o, els: Object.assign({ root }, lk.els), len: 0, v5: { id, el: root, block: b, sync: () => [{ id: 'lockup-settled', t: start + lk.end }] }, v5Key: '' };
+  }
   const titleLockup = {
     IN: 1.8,
-    calc(t, o) {
+    calc(t, o, st) {
       const e = env(t, o, titleLockup.IN, 0.5), lt = e.lt, x = exitOf(e);
-      return { phase: e.phase, op: x.op, y: x.y, kickerOp: E.p2o(rmp(lt, 0, 0.45)), markOp: E.p2o(rmp(lt, 0.25, 0.8)), markScale: 0.96 + 0.04 * E.p3o(rmp(lt, 0.25, 1.1)), ruleU: E.p3o(rmp(lt, 0.9, 1.45)), labelOp: E.p2o(rmp(lt, 1.3, 1.8)), still: lt >= titleLockup.IN, sync: [{ id: 'lockup-settled', t: o.t0 + titleLockup.IN * e.k }] };
+      return { phase: e.phase, op: x.op, y: x.y, kickerOp: E.p2o(rmp(lt, 0, 0.45)), markOp: E.p2o(rmp(lt, 0.25, 0.8)), markScale: 0.96 + 0.04 * E.p3o(rmp(lt, 0.25, 1.1)), ruleU: E.p3o(rmp(lt, 0.9, 1.45)), labelOp: E.p2o(rmp(lt, 1.3, 1.8)), still: lt >= titleLockup.IN, sync: st && st.v5 ? st.v5.sync() : [{ id: 'lockup-settled', t: o.t0 + titleLockup.IN * e.k }] };
     },
     build(host, o) {
+      const TY = V5.typo(); if (TY) return lockupState(TY, host, o);                 // v5: TYPO.lockup behind the v4 signature
       const root = mk('div', 'bl-lockup', host), ink = ink62(o.fg || '#E9F3F9', o.bg || '#082A34');
       const kicker = mk('div', 'bl-lockup-kicker', root); kicker.textContent = o.kicker || ''; kicker.style.color = ink;
       const mark = mk('div', 'bl-lockup-mark', root); mark.textContent = o.wordmark || ''; mark.style.color = o.fg || '#E9F3F9';
@@ -769,8 +841,28 @@
       const label = mk('div', 'bl-lockup-label', root); label.textContent = o.label || ''; label.style.color = ink;
       return { o, els: { root, kicker, mark, rule: p, label }, len };
     },
-    draw(st, t, win) { const O = win ? Object.assign({}, st.o, win) : st.o; const s = titleLockup.calc(t, O), e = st.els; setOp(e.root, s.op); setTf(e.root, 'translateY(' + px(s.y) + ')'); setOp(e.kicker, s.kickerOp); setOp(e.mark, s.markOp); setTf(e.mark, 'scale(' + s.markScale.toFixed(4) + ')'); e.rule.style.strokeDashoffset = (st.len * (1 - s.ruleU)).toFixed(2); setOp(e.label, s.labelOp); return s; }
+    draw(st, t, win) { const O = win ? Object.assign({}, st.o, win) : st.o;
+      if (st.v5) { rewindow(st, win, (h, oo) => lockupState(V5.typo(), h, oo)); seekBlock(st.v5.block, t); return titleLockup.calc(t, O, st); }
+      const s = titleLockup.calc(t, O), e = st.els; setOp(e.root, s.op); setTf(e.root, 'translateY(' + px(s.y) + ')'); setOp(e.kicker, s.kickerOp); setOp(e.mark, s.markOp); setTf(e.mark, 'scale(' + s.markScale.toFixed(4) + ')'); e.rule.style.strokeDashoffset = (st.len * (1 - s.ruleU)).toFixed(2); setOp(e.label, s.labelOp); return s; }
   };
+  /* BL.decisionCard / BL.receipt — the v5 cards (lib/blocks2.js) behind the v4 build / draw / calc shape, for scenes
+     that drive blocks from frame(t). opts: {t0 | land, t1, exit, id, …the BL2 options: fields, title, seal, typeDur, sealAt,
+     width | parts, check, tone}. decisionCard lands on the seal frame, receipt on its 2 % snap. These cards were born on
+     GSAP: without lib/motion.js + lib/blocks2.js build() throws (there is no 2D twin to fall back to). */
+  function v5card(name) {
+    const make = (host, o) => {
+      const B2 = V5.bl2(); if (!B2) throw new Error('BL.' + name + ' needs lib/motion.js and lib/blocks2.js (v5) on the page');
+      const h = B2[name](host, Object.assign({}, o, { id: blockId(name, o), end: o.t1, exit: o.exit }, o.land != null ? { land: o.land } : { start: o.t0 || 0 }));
+      return { o, els: { root: h.el }, v5: h, v5Key: '' };
+    };
+    const card = {
+      build: make,
+      calc(t, o, st) { const h = st && st.v5; if (!h) return { phase: 'off', u: 0, landed: false, land: null, sync: [] }; const a = h.at(t); return { phase: !a.inWindow ? 'off' : a.landed ? 'hold' : 'in', u: a.u, landed: a.landed, land: h.land(), sync: h.sync() }; },
+      draw(st, t, win) { rewindow(st, win, make); seekBlock(st.v5.block, t); return card.calc(t, win ? Object.assign({}, st.o, win) : st.o, st); }
+    };
+    return card;
+  }
+  const decisionCard = v5card('decisionCard'), receipt = v5card('receipt');
   /* BL.ctaClose — the action-only close: words land per word (rise 24 px + fade, power3.out, 0.10 s stagger), one
      capsule pops from scale 0.85 at 0.72 s with a single restrained overshoot, settled by 1.32 s, then DEAD STILL.
      opts: {t0, t1?, line, button, accent}. Keep the bottom 16.67 % band free — the mandatory credit lives there. */
@@ -954,10 +1046,45 @@
     const el = document.createElement('style'); el.id = 'bl-css'; el.textContent = css; document.head.appendChild(el);
   }
 
-  root.BL = { VERSION: '4.0.0', E, clamp, rmp, lerp, env, exitOf, rows, driftZero, holdDrift, jitter, lcg, mixColor, ink62, collectSync, fmtNum,
+  /* ============================================================ selftest (node) ================================ */
+  /* the pure laws, no DOM: envelope compression, frame tables, the flash envelope, the kpi schedule, seeded schedules,
+     and the v5 detection (null in node: the v4 path is the only path here) */
+  function selftest() {
+    const fails = [], near = (a, b, e) => Math.abs(a - b) <= (e || 1e-9);
+    const e1 = env(0.5, { t0: 0, t1: 10, exit: 'fade' }, 2, 0.45); if (e1.phase !== 'in' || e1.k !== 1 || !near(e1.hold, 10 - 2.45)) fails.push('env plain ' + JSON.stringify(e1));
+    const e2 = env(0.5, { t0: 0, t1: 1, exit: 'fade' }, 2, 0.45); if (!near(e2.k, 1 / 2.45) || !near(e2.IN + e2.OUT, 1) || !near(e2.hold, 0)) fails.push('env compression ' + JSON.stringify(e2));
+    if (env(5, { t0: 0 }, 1).phase !== 'hold' || env(-1, { t0: 0 }, 1).phase !== 'off' || env(9.9, { t0: 0, t1: 10, exit: 'up' }, 1).phase !== 'out') fails.push('env phases');
+    if (exitOf(env(9.9, { t0: 0, t1: 10, exit: 'up' }, 1)).y >= 0 || exitOf(env(9.9, { t0: 0, t1: 10 }, 1)).op !== 1) fails.push('exitOf');
+    const tb = rows((lt, u) => u, 1, 30); if (tb.n !== 30 || tb.at(0.5 / 30) !== tb.at(0.9 / 30) || tb.at(2) !== 1 || tb.at(-1) !== 0) fails.push('rows quantisation');
+    const f0 = flash(1.0, 1.0), fm = flash(1.1, 1.0), f1 = flash(1.4, 1.0); if (!f0.active || f0.washOp !== 0 || !(fm.washOp > 0 && fm.washOp < 0.92) || f1.active || f1.washOp !== 0) fails.push('flash envelope');
+    const K = { t0: 0, land: 3, value: 29, suffix: ' %' }, plan = kpi.plan(K); if (!near(plan.count, 3 - 0.38) || plan.final !== '29' || !near(plan.tLand, 3)) fails.push('kpi plan ' + JSON.stringify(plan));
+    const kc = kpi.calc(3.0, K), kb = kpi.calc(1.0, K); if (kc.text !== '29' || !(kb.text !== '29' && +kb.text < 29) || kc.sync[0].t !== 3) fails.push('kpi calc ' + kc.text + ' ' + kb.text);
+    const a = keystrokes('Submit', 0, { seed: 7 }), b = keystrokes('Submit', 0, { seed: 7 }), c = keystrokes('Submit', 0, { seed: 8 }); if (a.times.join() !== b.times.join() || a.times.join() === c.times.join() || a.at(99) !== 'Submit') fails.push('keystrokes seeded');
+    const s = stream(['one', 'two', 'three'], 0, { endAt: 2 }); if (!near(s.tLast, 2) || s.at(99).some(v => v !== 1) || s.at(-1).some(v => v !== 0)) fails.push('stream endAt');
+    const r1 = lcg(5), r2 = lcg(5); if (r1() !== r2() || r1() !== r2()) fails.push('lcg');
+    if (mixColor('#000000', '#ffffff', 0.5) !== 'rgb(128,128,128)' || ink62('#ffffff', '#000000') !== 'rgb(158,158,158)') fails.push('colours');
+    const d0 = driftZero(0, 0, 3), dh = driftZero(3 - 0.35 - 1e-9, 0, 3); if (d0.dx !== 0 || Math.abs(dh.dx) > 1e-6 || driftZero(0.5, 0, 1).u !== 0) fails.push('driftZero ends at zero');
+    const tl = titleLockup.calc(1.8, { t0: 0 }); if (!tl.still || tl.ruleU !== 1 || tl.sync[0].t !== 1.8) fails.push('titleLockup calc');
+    if (V5.motion() || V5.bl2() || V5.typo()) fails.push('v5 libs detected in node');
+    let threw = false; try { decisionCard.build(null, { t0: 0 }); } catch (err) { threw = /blocks2/.test(err.message); } if (!threw) fails.push('decisionCard without BL2 must say what it needs');
+    for (const k of ['kpi', 'titleLockup', 'flash', 'decisionCard', 'receipt', 'chatReveal', 'stack', 'chart', 'race', 'code', 'stateRail', 'hud']) if (!BL[k]) fails.push('export ' + k);
+    return { ok: !fails.length, fails, version: BL.VERSION, delegates: ['kpi→BL2.countUp', 'titleLockup→TYPO.lockup', 'flash→BL2.flash', 'decisionCard→BL2', 'receipt→BL2'], v5_loaded: !!V5.motion() };
+  }
+
+  const BL = { VERSION: '5.0.0', E, clamp, rmp, lerp, env, exitOf, rows, driftZero, holdDrift, jitter, lcg, mixColor, ink62, collectSync, fmtNum,
     kpi, count, keystrokes, prompt, thinkDot, stream, bubble, dots, chatReveal, stack, chart, race,
     deviceFrame, browserFrame: deviceFrame, screenSwap, beforeAfter, screenRail,
     codeType, sweep, diff, scrollTo, code, stateRail, hud, agentTag,
     flash, freezeDress, hardCut, recHud, titleLockup, ctaClose, wordSweep, tokens: TOK,
-    servo, focusZoom, spring, cursorArc, clickRing, press, cursorLeave, follow, installStyles };
+    servo, focusZoom, spring, cursorArc, clickRing, press, cursorLeave, follow, installStyles,
+    decisionCard, receipt, seekBlock, V5, selftest };
+  root.BL = BL;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BL;
+    if (require.main === module) {
+      const argv = process.argv.slice(2);
+      if (argv.indexOf('--selftest') >= 0) { const r = selftest(); process.stdout.write(JSON.stringify(r, null, 2) + '\n'); process.exit(r.ok ? 0 : 1); }
+      process.stderr.write('usage: node blocks.js --selftest\n'); process.exit(2);
+    }
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

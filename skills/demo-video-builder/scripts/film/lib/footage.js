@@ -13,7 +13,12 @@
      establish             {hold, dur}: open on the ORIGINAL full screen, hold, then push into s0/c0
      moves[].abs           true = coordinates already on the full screen (pull back: {s:1, c:[640,360], abs:true})
      y0 / scroll           page scroll (doc px): [{t0,dur,y}] eased like a browser (1-(1-u)^3)
-     play                  seq timing {at, from, rate, loop:[a,b]}
+     play                  seq timing {at, from, to, rate, loop:[a,b], reverse}
+                           from/to bound the source window (1-based frame indices); past `to` the last frame of the window
+                           is held (the end state is cloned, never trimmed); reverse:true plays the window backwards and
+                           holds its first frame at the end. tools/cutlist.py writes these from a text cut list.
+     hold                  fraction of the shot after which only the declared background may move (gates/hold_gate.py);
+                           required on recreated beats, forbidden on footage match-cuts (references/hold-doctrine.md)
      reveal                typed text uncovered word by word on the narration clock (see REVEAL)
      stream                a curtain that streams an answer in top-down {t0,dur,from,to,bg}
      seam                  a seamless hand-off (not counted as a cut by QA)
@@ -71,6 +76,22 @@
     return SHOTS;
   }
 
+  /* ---------- which source frame a seq clip shows at film time t (pure; node-testable) ---------- */
+  // c = {frames, fps}; sh.play = {at, from, to, rate, loop, reverse, map}. 1-based frame index into f_NNN.jpg.
+  function seqFrameIndex(sh, c, t) {
+    const n = c.frames, p = sh.play || {}, from = p.from || 1, to = Math.min(n, p.to || n);
+    if (p.map) return 1 + Math.floor(clamp(p.map(t), 0, 1) * (n - 1) + 1e-6);   // speed ramp: map(t) → 0..1 of the clip
+    const at = sh.play ? p.at : sh.t0, rate = p.rate || 1, dt = Math.max(0, t - at);
+    // rate may be a number or a speed-ramp lane [[t, rate], …] (lib/vfx.js VFX.ramp — trapezoid integral of the lane)
+    let f = (Array.isArray(rate) && root.VFX && root.VFX.ramp) ? root.VFX.ramp.frameAt(rate, dt, c.fps, n, from) : from + Math.floor(dt * c.fps * (Array.isArray(rate) ? 1 : rate) + 1e-6);
+    if (f > to) {
+      if (p.loop) { const a = p.loop[0] + 1, b = p.loop[1] + 1; f = a + ((f - to - 1) % (b - a + 1)); }
+      else f = to;                                                    // the end state is held (cloned), never trimmed
+    }
+    if (p.reverse) f = to - (f - from);                                // backwards through the window; its first frame holds at the end
+    return Math.max(1, Math.min(n, f));
+  }
+
   /* ---------- the lane ---------- */
   function create(o) {
     // o: {T (timeline: P, WORDS, wt), CL (clips), HL (highlights), base ('../broll/'), els: {wrap, img, reveal,
@@ -110,18 +131,7 @@
       }
       clipName = name;
     }
-    function seqFrame(sh, t) {
-      const c = CL[sh.clip], n = c.frames, from = (sh.play && sh.play.from) || 1;
-      if (sh.play && sh.play.map) return 1 + Math.floor(clamp(sh.play.map(t), 0, 1) * (n - 1) + 1e-6);   // speed ramp: map(t) → 0..1 of the clip
-      const at = sh.play ? sh.play.at : sh.t0, rate = (sh.play && sh.play.rate) || 1, dt = Math.max(0, t - at);
-      // rate may be a number or a speed-ramp lane [[t, rate], …] (lib/vfx.js VFX.ramp — trapezoid integral of the lane)
-      let f = (Array.isArray(rate) && root.VFX && root.VFX.ramp) ? root.VFX.ramp.frameAt(rate, dt, c.fps, n, from) : from + Math.floor(dt * c.fps * (Array.isArray(rate) ? 1 : rate) + 1e-6);
-      if (f > n) {
-        if (sh.play && sh.play.loop) { const a = sh.play.loop[0] + 1, b = sh.play.loop[1] + 1; f = a + ((f - n - 1) % (b - a + 1)); }
-        else f = n;
-      }
-      return f;
-    }
+    function seqFrame(sh, t) { return seqFrameIndex(sh, CL[sh.clip], t); }
     function scrollY(sh, t) {
       let y = sh.y0 || 0;
       for (const k of (sh.scroll || [])) { const u = 1 - Math.pow(1 - clamp((t - k.t0) / k.dur, 0, 1), 3); y = lerp(y, k.y, u); }
@@ -195,8 +205,31 @@
     function hide() { op(E.wrap, 0); drawReveal(null, 0); }
     function reset() { clipName = null; revealKey = null; E.reveal.innerHTML = ''; }
     function shotAt(SH, t) { let cur = null; for (const s of SH) { if (t >= s.t0 && t < (s.t1 === undefined ? 1e9 : s.t1)) cur = s; else if (t < s.t0) break; } return cur; }
-    return { draw, hide, reset, shotAt, scrollY };
+
+    /* imageFor(shot|clipName, t): a decoded <img> of the real pixels a GL transition needs on one side of a cut
+       (lib/shaders.js GL.cutTransition from/to thunks). The image is created once per src and kept off-DOM;
+       its decode Promise joins `pending` so the renderer waits for it. Call preload() for both sides at least
+       one frame before the window opens. still → f_001; seq → the frame the shot shows at t; page → the chrome
+       frame nearest the scroll position (the scrolled document itself is composed in the DOM, so a page clip
+       should be transitioned through a canvas snapshot the scene draws, not through imageFor). */
+    const imgCache = {};
+    function srcFor(sh, t) {
+      const name = typeof sh === 'string' ? sh : sh.clip, c = CL[name];
+      if (c.kind === 'seq' && typeof sh !== 'string') return base + name + '/f_' + String(seqFrame(sh, t)).padStart(3, '0') + '.jpg';
+      if (c.kind === 'seq') return base + name + '/f_001.jpg';
+      if (c.kind === 'page') { if (!c.chrome) return base + name + '/page.jpg'; const y = typeof sh === 'string' ? 0 : scrollY(sh, t); let i = 0; (c.offsets || [0]).forEach((o2, j) => { if (o2 <= y + 40) i = j; }); return base + name + '/chrome_' + i + '.jpg'; }
+      return base + name + '/f_001.jpg';
+    }
+    function imageFor(sh, t) {
+      const src = srcFor(sh, t || 0);
+      let im = imgCache[src];
+      if (!im) { im = new Image(); im.decoding = 'sync'; im.src = src; im.__decode = im.decode().catch(() => {}); imgCache[src] = im; }
+      pending.push(im.__decode);
+      return im;
+    }
+    function preload(sh, t) { return imageFor(sh, t).__decode; }
+    return { draw, hide, reset, shotAt, scrollY, imageFor, preload, srcFor };
   }
 
-  root.FOOT = { create, fullscreen, REVEAL };
+  root.FOOT = { create, fullscreen, REVEAL, seqFrameIndex };
 })(typeof window !== 'undefined' ? window : globalThis);

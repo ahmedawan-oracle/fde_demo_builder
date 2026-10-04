@@ -9,9 +9,10 @@
                        swatches are listed, the gate FAILS: graded product pixels must be verified, not trusted.
   effects off footage  Static: (a) clips.json -- every product clip's `grade` uses adjust keys only, within the
                        product limits (exposure +-0.3, temperature/tint +-0.15), and never lut/saturation/vibrance;
-                       (b) the authored scene + shots (comments stripped) never aim a VFX drawing call, a CSS filter
-                       or a blend mode at the footage lane (#clipWrap, #clipImg, #pageImg, #pageDoc, #pageView,
-                       FOOT.*, lane.*); (c) film.json `grade` never targets product clips.
+                       (b) the authored scene + shots (comments stripped) never aim a VFX drawing call, a GL finishing
+                       pass (GL.pass / GL.chain: vignette, grain, bloom, chromatic aberration), a CSS filter or a blend
+                       mode at the footage lane (#clipWrap, #clipImg, #pageImg, #pageDoc, #pageView, FOOT.*, lane.*);
+                       (c) film.json `grade` never targets product clips.
 
 swatches.json (project root; path from qa.json "swatches", default "swatches.json"):
   [ {"clip": "nb", "t": 12.4, "name": "accent",  "xy": [1680, 32],  "hex": "#0E7C86"},
@@ -36,7 +37,7 @@ HUE_DEG, SAT_PCT, DE76_MAX, MIN_CHROMA = 6.0, 10.0, 8.0, 12.0
 ADJUST_KEYS = ('exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks', 'temperature', 'tint')
 PRODUCT_LIMITS = {'exposure': 0.3, 'temperature': 0.15, 'tint': 0.15}
 FOOTAGE_RE = re.compile(r'clipWrap|clipImg|pageImg|pageDoc|pageView|revealHost|stillHl|pageHl|\bFOOT\.|\blane\.|data-footage|footage', re.I)
-VFX_CALL_RE = re.compile(r'\bVFX\s*\.\s*(grain|haze|glitch|waveWarp|bloom|applyBloomGhost|chromaticSplit|drawSeam|vignette)\s*\(')
+VFX_CALL_RE = re.compile(r'\b(?:VFX\s*\.\s*(grain|haze|glitch|waveWarp|bloom|applyBloomGhost|chromaticSplit|drawSeam|vignette)|GL\s*\.\s*(pass|chain))\s*\(')
 
 
 def call_args(txt, pos, limit=400):
@@ -168,7 +169,8 @@ def effects_off_footage(ctx):
         seen.add(f); txt = STRIP(open(f, encoding='utf-8', errors='replace').read()); base = os.path.basename(f)
         for m in VFX_CALL_RE.finditer(txt):
             args = call_args(txt, m.end())
-            if FOOTAGE_RE.search(args): problems.append('%s: VFX.%s(%s) targets the footage lane' % (base, m.group(1), ' '.join(args.split())[:40]))
+            who = ('VFX.' + m.group(1)) if m.group(1) else ('GL.' + m.group(2))
+            if FOOTAGE_RE.search(args): problems.append('%s: %s(%s) targets the footage lane' % (base, who, ' '.join(args.split())[:40]))
         for m in CSS_RULE_RE.finditer(txt):
             body = m.group(2)
             if re.search(r'(?<![-\w])(filter|mix-blend-mode|backdrop-filter)\s*:', body) and not re.search(r'filter\s*:\s*none', body):
@@ -179,7 +181,7 @@ def effects_off_footage(ctx):
     if isinstance(fg, dict):
         for k in ('product', 'footage', 'clips_lut'):
             if k in fg: problems.append('film.json grade.%s: grading must happen per clip in clips.json (adjust only)' % k)
-    if problems: return False, '; '.join(problems)[:220]
+    if problems: return False, '; '.join(problems)[:360]
     return True, 'no VFX/filters on the footage lane; product grades adjust-only within limits'
 
 
@@ -212,8 +214,10 @@ def selftest(tmp=None):
     clips = [{'name': 'ui', 'kind': 'still', 't': 0.5, 'crop': [0, 0, 1920, 1080], 'grade': {'blacks': 0.03, 'temperature': -0.05}}]
     json.dump(clips, open(os.path.join(tmp, 'clips.json'), 'w'))
     scene_ok = os.path.join(tmp, 'film.html'); scene_bad = os.path.join(tmp, 'film_bad.html')
-    open(scene_ok, 'w').write('<style>#clipWrap{position:absolute;filter:none}</style><script>/* VFX.grain(clipCtx) in a comment is fine */\nVFX.grain(grainCtx, t, {amount:0.12}); VFX.vignette($("#vig"));</script>')
-    open(scene_bad, 'w').write('<style>#clipImg{filter:saturate(1.3)}</style><script>VFX.glitch(ctx, $("#clipWrap"), t, 3, 0.3); clipImg.style.mixBlendMode="screen";</script>')
+    open(scene_ok, 'w').write('<style>#clipWrap{position:absolute;filter:none}</style><script>/* VFX.grain(clipCtx) in a comment is fine */\nVFX.grain(grainCtx, t, {amount:0.12}); VFX.vignette($("#vig"));\n'
+                              'GL.chain(glx, titleCanvas, [["vignette", {amount: 0.12}], ["grain", {frame: GL.frameIndex(t)}]]); GL.pass(glx, "copy", card, {zoom: push.z});</script>')
+    open(scene_bad, 'w').write('<style>#clipImg{filter:saturate(1.3)}</style><script>VFX.glitch(ctx, $("#clipWrap"), t, 3, 0.3); clipImg.style.mixBlendMode="screen";\n'
+                               'GL.pass(glx, "grain", $("#clipImg"), {amount: 0.06}); GL.chain(glx, lane.imageFor("q"), [["vignette", {}]]);</script>')
     base = {'project': tmp, 'qa': {'swatches': 'swatches.json', 'clips': 'clips.json'}, 'cfg': {'recording': 'recording.mp4'}, 'timeline': {}, 'shots_js': None}
     r = R(film=good, scene_html=scene_ok)
     check('good grade passes colour truth', r['ui colour truth'][0], r['ui colour truth'][1])
@@ -221,6 +225,7 @@ def selftest(tmp=None):
     r = R(film=bad, scene_html=scene_bad)
     check('warm+saturated film fails truth', not r['ui colour truth'][0], r['ui colour truth'][1])
     check('filter on footage fails', not r['effects off footage'][0] and 'glitch' in r['effects off footage'][1] and 'CSS' in r['effects off footage'][1], r['effects off footage'][1])
+    check('GL.pass / GL.chain on the lane fail', 'GL.pass(' in r['effects off footage'][1] and 'GL.chain(' in r['effects off footage'][1], r['effects off footage'][1])
     json.dump([dict(clips[0], grade={'saturation': 0.3, 'temperature': 0.2})], open(os.path.join(tmp, 'clips.json'), 'w'))
     r = R(film=good, scene_html=scene_ok)
     check('non-adjust grade on product fails', not r['effects off footage'][0] and 'non-adjust' in r['effects off footage'][1] and 'beyond' in r['effects off footage'][1], r['effects off footage'][1])

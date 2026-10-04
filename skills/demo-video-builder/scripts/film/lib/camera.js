@@ -7,7 +7,8 @@
 
    What it adds (numbers are the measured rules in references/camera-moves.md):
      eases       power2/3/4 out ('p2','p3','p4'), 'expo', in-eases for exits ('p2in','p3in','p4in'), inOut
-                 ('p2io','p3io'), plus footage.js's 'io' (sine in-out) and 'out' (sine out, the default)
+                 ('p2io','p3io'), plus footage.js's 'io' (sine in-out) and 'out' (sine out, the default) — every
+                 curve is read from the ONE ease table in lib/grammar.js (G.easeFn); GSAP names ('power3.inOut') work too
      pose        CAM.resolve(sh, t, ctx): s0/c0 + moves with named eases + revealOut + punches + caret follow
                  + idle drift + the stage clamp — a superset of footage.js camFor
      punch       CAM.punchTo / CAM.punchOut: 0.14–0.25 s power4.out hard reframe, <= +25 % scale, hold >= 0.8 s
@@ -21,7 +22,9 @@
      caret       CAM.followCaret / CAM.caretX: pin the typed caret at ~60 % of the frame, min()-continuous
      ladder      CAM.ladder / CAM.lint: pose ladder per shot + dwell / ease-law / verb-variety lint
      budget      CAM.fitScale / CAM.pushToFit / CAM.upsample / CAM.budget: 88 % headroom, upsample warn 1.6 fail 2.0
-     idle        CAM.idle (Lissajous, ratio 1.3) and CAM.pushLong (ease window longer than the shot)
+     idle        CAM.idle (Lissajous, ratio 1.3) and CAM.pushLong (ease window longer than the shot); on the footage
+                 lane (#clipWrap) the idle is only a scale breath <= RULES.idle.footageMax — "footage never wobbles;
+                 recreated layers never freeze" (a card may use the full amplitude)
      hit         CAM.hit: flash 0.55 -> 0 over 0.28 s, dressing settles to 0.75, +2 % snap
      streak      CAM.speed / CAM.streak / CAM.travelBlur: directional blur that rides the camera speed
      trace       CAM.trace: 30 fps camera curves + scheduled-motion windows for gates/motion_diag.py
@@ -31,29 +34,33 @@
      node scenes/lib/camera.js --curves scenes/timing_<name>_data.js scenes/shots.js broll/clips.js [--out out] [--fps 30]
        -> out/camera_curves.json  per-shot samples {t,s,cx,cy}, speed px/frame, windows of scheduled motion
        -> out/camera_report.json  pose ladder, lint items (WARN/FAIL), zoom budget per shot, seq schedules
-       exit 1 when any lint item is a FAIL or any shot exceeds the zoom budget. */
+       exit 1 when any lint item is a FAIL or any shot exceeds the zoom budget.
+     node scenes/lib/camera.js --selftest   -> JSON {ok, fails}; exit 0 ok / 1 fails (ease table parity, idle scoping, lint) */
 (function (root) {
   'use strict';
-  const G = root.G || {};
+  let G = root.G;
+  /* node (CLI / selftest / export_timeline): grammar.js lives beside this file and binds to `window` */
+  if (!G && typeof module !== 'undefined' && typeof require === 'function') { try { if (typeof root.window === 'undefined') root.window = root; require('./grammar.js'); G = root.G; } catch (e) { /* no grammar.js beside us: the check below says so */ } }
+  G = G || {};
+  if (typeof G.easeFn !== 'function') throw new Error('camera.js: load lib/grammar.js (v5, G.easeFn) before lib/camera.js — one ease table serves every lib');
   const clamp = G.clamp || ((x, a, b) => Math.max(a, Math.min(b, x)));
   const rmp = G.rmp || ((t, a, b) => clamp((t - a) / (b - a), 0, 1));
   const lerp = G.lerp || ((a, b, x) => a + (b - a) * x);
   const STAGE = [1280, 720];
 
-  /* ---------- eases (u in 0..1) ---------- */
-  const EZ = x => Math.sin(clamp(x, 0, 1) * Math.PI / 2);                      // sine-out  (footage default)
-  const EIO = x => 0.5 - 0.5 * Math.cos(clamp(x, 0, 1) * Math.PI);             // sine-in-out (footage 'io')
-  const P2 = x => 1 - Math.pow(1 - clamp(x, 0, 1), 2);                        // power2.out
-  const P3 = x => 1 - Math.pow(1 - clamp(x, 0, 1), 3);                        // power3.out (browser scroll)
-  const P4 = x => 1 - Math.pow(1 - clamp(x, 0, 1), 4);                        // power4.out (punch, dive, landing)
-  const EXPO = x => (x = clamp(x, 0, 1)) >= 1 ? 1 : 1 - Math.pow(2, -10 * x);  // expo.out (reveal pull)
-  const P2IN = x => Math.pow(clamp(x, 0, 1), 2), P3IN = x => Math.pow(clamp(x, 0, 1), 3), P4IN = x => Math.pow(clamp(x, 0, 1), 4);
-  const P2IO = x => (x = clamp(x, 0, 1)) < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
-  const P3IO = x => (x = clamp(x, 0, 1)) < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-  const LIN = x => clamp(x, 0, 1);
-  const EASE = { out: EZ, io: EIO, p2: P2, p3: P3, p4: P4, expo: EXPO, p2in: P2IN, p3in: P3IN, p4in: P4IN, p2io: P2IO, p3io: P3IO, lin: LIN };
+  /* ---------- eases (u in 0..1): the short camera names are aliases into lib/grammar.js EASE_FN, read via G.easeFn ---------- */
+  const EASE_GSAP = { out: 'sine.out',        // sine-out  (footage default)
+                      io: 'sine.inOut',       // sine-in-out (footage 'io')
+                      p2: 'power2.out', p3: 'power3.out', p4: 'power4.out',   // power3 = browser scroll; power4 = punch, dive, landing
+                      expo: 'expo.out',       // reveal pull
+                      p2in: 'power2.in', p3in: 'power3.in', p4in: 'power4.in', p2io: 'power2.inOut', p3io: 'power3.inOut', lin: 'linear' };
+  const EASE = {}; Object.keys(EASE_GSAP).forEach(k => { EASE[k] = G.easeFn(EASE_GSAP[k]); });
+  const EZ = EASE.out, EIO = EASE.io, P2 = EASE.p2, P3 = EASE.p3, P4 = EASE.p4, EXPO = EASE.expo, P2IN = EASE.p2in, P3IN = EASE.p3in, P4IN = EASE.p4in, P2IO = EASE.p2io, P3IO = EASE.p3io, LIN = EASE.lin;
+  /* a GSAP ease string the grammar table knows ('power3.inOut', 'back.out(1.6)') -> function, else null */
+  const gsapEase = e => { if (typeof e !== 'string' || e.indexOf('.') < 0) return null; try { return G.easeFn(e); } catch (err) { return null; } };
+  const knownEase = e => typeof e === 'function' || !!EASE[e] || !!gsapEase(e);
   /* ease name or function -> function; unknown names fall back to the footage default (sine-out) */
-  const easeOf = e => typeof e === 'function' ? e : (EASE[e] || EZ);
+  const easeOf = e => typeof e === 'function' ? e : (EASE[e] || gsapEase(e) || EZ);
 
   /* ---------- measured rules (defaults for every helper and for the lint) ---------- */
   const RULES = {
@@ -66,7 +73,7 @@
     connector: { stretch: 0.12, sx: 1.35, sy: 0.92, blur: 14, switchAt: 0.14, recover: 0.18 },
     focus: { blur: 16, soft: 8, heavy: 24, dim: 0.55, dimMin: 0.35, dur: 0.8, release: 0.3 },
     dolly: { d0: 1400, d0Min: 600, d0Max: 3000, ratio: 2, ratioMin: 1.1, ratioMax: 4, dur: 4 },
-    idle: { ax: 5, ay: 2.5, ratio: 1.3, cycles: 1, ds: 0.01, footageMax: 0.01 },
+    idle: { ax: 5, ay: 2.5, ratio: 1.3, cycles: 1, ds: 0.01, footageMax: 0.01, footage: '#clipWrap, [data-footage]' },
     hit: { flash: 0.55, flashDur: 0.28, settle: 0.75, settleAt: 0.35, settleDur: 0.35, snap: 1.02, snapDur: 0.14 },
     streak: { peak: 18, cap: 20, min: 24 },
     seams: { maxKinds: 2, accentShare: 0.25 },
@@ -100,14 +107,20 @@
     return { s, cx, cy };
   }
   /* the camera to render: pose + caret follow (ctx.caretX, stage px before the camera) + idle + clamp.
-     ctx: {caretX, stage}. sh.idle = {ax, ay, ratio, cycles, ds} (footage: keep ds <= 0.01). */
+     ctx: {caretX, stage, footage, el}. sh.idle = {ax, ay, ratio, cycles, ds}. The camera frames the footage lane unless
+     ctx.footage is false (or ctx.el is a recreated layer): on footage the idle keeps only a breath <= footageMax. */
   function resolve(sh, t, ctx) {
     ctx = ctx || {};
     let p = pose(sh, t);
     if (sh.followCaret && typeof ctx.caretX === 'number') p = followCaret(p, ctx.caretX, sh.followCaret, ctx.stage);
-    if (sh.idle) p = withIdle(p, idle(t, sh.t0, Object.assign({ dur: (sh.t1 || sh.t0 + 6) - sh.t0 }, sh.idle)));
+    if (sh.idle) {
+      const footage = ctx.footage !== undefined ? !!ctx.footage : (ctx.el ? isFootage(ctx.el) : true);
+      p = withIdle(p, idle(t, sh.t0, Object.assign({ dur: (sh.t1 || sh.t0 + 6) - sh.t0 }, sh.idle, { footage })));
+    }
     return clampPose(p, ctx.stage);
   }
+  /* is this element the footage lane (or inside it)? the selector is RULES.idle.footage */
+  const isFootage = el => !!(el && typeof el === 'object' && el.matches && (el.matches(RULES.idle.footage) || (el.closest && el.closest(RULES.idle.footage))));
   /* write a pose onto the camera wrapper (same transform form as G.applyCam: translate then scale, origin 0 0).
      opts.streakNode: an <feGaussianBlur> to receive opts.streak ('X 0' string) — '0 0' when absent. */
   function applyPose(el, p, opts) {
@@ -330,11 +343,15 @@
   }
 
   /* ---------- idle: Lissajous drift + breathing, so a hold never dies ---------- */
-  /* o: {ax:5, ay:2.5 (px), ratio:1.3, cycles:1, dur, ds:0.01} -> {dx, dy, ds (multiplier)} */
+  /* o: {ax:5, ay:2.5 (px), ratio:1.3, cycles:1, dur, ds:0.01, footage:false} -> {dx, dy, ds (multiplier), footage}
+     footage never wobbles; recreated layers never freeze: with footage:true (CAM.resolve sets it for the lane, #clipWrap)
+     the travel is zero and the breath is capped at RULES.idle.footageMax — product pixels may breathe 1 %, never drift. */
   function idle(t, t0, o) {
-    const R = RULES.idle, ax = o.ax === undefined ? R.ax : o.ax, ay = o.ay === undefined ? R.ay : o.ay, ratio = o.ratio || R.ratio;
+    const R = RULES.idle, onFootage = !!o.footage, ratio = o.ratio || R.ratio;
+    const ax = onFootage ? 0 : (o.ax === undefined ? R.ax : o.ax), ay = onFootage ? 0 : (o.ay === undefined ? R.ay : o.ay);
+    let ds = o.ds === undefined ? R.ds : o.ds; if (onFootage) ds = Math.min(ds, R.footageMax);
     const ph = 2 * Math.PI * (o.cycles || R.cycles) * (t - t0) / Math.max(0.1, o.dur || 6);
-    return { dx: ax * Math.sin(ph), dy: ay * Math.sin(ratio * ph), ds: 1 + (o.ds === undefined ? R.ds : o.ds) * Math.sin(0.7 * ph) };
+    return { dx: ax * Math.sin(ph), dy: ay * Math.sin(ratio * ph), ds: 1 + ds * Math.sin(0.7 * ph), footage: onFootage };
   }
   const withIdle = (p, d) => ({ s: p.s * d.ds, cx: p.cx - d.dx / p.s, cy: p.cy - d.dy / p.s });
   /* a push whose ease window runs 0.5 s past the move, so velocity never reaches zero on screen */
@@ -421,7 +438,7 @@
           else if (l.dur < R.teleport - 1e-6) add('WARN', 'teleport', `${l.verb} ${l.dur} s (under 0.8 s teleports)`);
           if (l.dur > R.durMax + 1e-6 && !l.long && l.verb !== 'reveal') add('FAIL', 'move too long', `${l.verb} ${l.dur} s (> 2.5 s drags)`);
         }
-        if (['out', 'io', 'fn'].indexOf(l.ease) < 0 && !EASE[l.ease]) add('FAIL', 'unknown ease', `'${l.ease}'`);
+        if (['out', 'io', 'fn'].indexOf(l.ease) < 0 && !knownEase(l.ease)) add('FAIL', 'unknown ease', `'${l.ease}'`);
         if (j > 0) {
           const gap = l.t0 - L.legs[j - 1].t1;
           if (gap < R.dwell - 1e-6 && !(l.punch && gap >= R.punchHold - 1e-6) && !L.legs[j - 1].punch) add('WARN', 'no dwell', `${gap.toFixed(2)} s between ${L.legs[j - 1].verb} and ${l.verb} (>= ${R.dwell} s)`);
@@ -433,6 +450,11 @@
       });
       if (sh.revealOut && sh.t1 && sh.revealOut.at + sh.revealOut.dur > sh.t1 + 1e-3) add('FAIL', 'reveal ends late', 'the pull must end before the shot does');
       if (sh.establish && sh.establish.hold < RULES.zoom.startAfter - 1e-6) add('WARN', 'early push', `establish hold ${sh.establish.hold} s (start 0.5–1.5 s after the layout lands)`);
+      if (sh.idle && (o.footage === undefined || o.footage)) {        // shots frame the footage lane: the idle there is a breath, never a wobble
+        const ds = sh.idle.ds === undefined ? RULES.idle.ds : sh.idle.ds, travel = (sh.idle.ax !== undefined && sh.idle.ax !== 0) || (sh.idle.ay !== undefined && sh.idle.ay !== 0);
+        if (ds > RULES.idle.footageMax + 1e-9) add('WARN', 'idle on footage', `ds ${ds} > ${RULES.idle.footageMax} (footage never wobbles; the lane clamps the breath)`);
+        if (travel) add('WARN', 'idle on footage', `ax/ay travel is ignored on the footage lane (recreated layers may drift; product pixels may only breathe)`);
+      }
     });
     const kinds = {}; let accents = 0;
     SHOTS.forEach(sh => { if (sh.enter) { kinds[sh.enter.kind] = 1; accents++; } });
@@ -505,13 +527,45 @@
     process.exit(L.fails || bad.length ? 1 : 0);
   }
 
-  const CAM = { RULES, EASE, easeOf, EZ, EIO, P2, P3, P4, EXPO, P2IN, P3IN, P4IN, P2IO, P3IO, LIN,
+  /* ---------- selftest (node): the ease aliases agree with the grammar table, the idle respects the footage lane, lint sees it ---------- */
+  function selftest() {
+    const fails = [], near = (a, b, eps) => Math.abs(a - b) <= (eps || 1e-12);
+    const closed = { out: x => Math.sin(x * Math.PI / 2), io: x => 0.5 - 0.5 * Math.cos(x * Math.PI), p2: x => 1 - Math.pow(1 - x, 2), p3: x => 1 - Math.pow(1 - x, 3), p4: x => 1 - Math.pow(1 - x, 4),
+      expo: x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x)), p2in: x => x * x, p3in: x => x * x * x, p4in: x => x * x * x * x, p2io: x => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2), p3io: x => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2), lin: x => x };
+    for (const k of Object.keys(EASE_GSAP)) for (const x of [0, 0.1, 0.25, 0.5, 0.73, 0.9, 1]) if (!near(EASE[k](x), closed[k](x))) fails.push(`ease ${k}(${x}) = ${EASE[k](x)} != ${closed[k](x)}`);
+    for (const k of Object.keys(EASE_GSAP)) if (EASE[k](-1) !== 0 || EASE[k](2) !== 1) fails.push(`ease ${k} does not clamp`);
+    if (easeOf('power3.inOut')(0.5) !== 0.5 || !near(easeOf('power3.inOut')(0.25), 4 * 0.25 * 0.25 * 0.25)) fails.push('GSAP name power3.inOut not routed through G.easeFn');
+    if (!near(easeOf('back.out(1.6)')(1), 1) || easeOf('back.out(1.6)')(0.7) <= 1) fails.push('back.out(1.6) overshoot missing');
+    if (easeOf('no-such-ease') !== EZ || !knownEase('p4') || knownEase('bogus.ease')) fails.push('easeOf fallback / knownEase');
+    const card = idle(1.3, 0, { dur: 6 }), lane = idle(1.3, 0, { dur: 6, footage: true }), hot = idle(1.3, 0, { dur: 6, footage: true, ds: 0.05, ax: 12 });
+    if (!(Math.abs(card.dx) > 0 && Math.abs(card.dy) > 0)) fails.push('recreated idle froze'); if (lane.dx !== 0 || lane.dy !== 0) fails.push('footage idle travels');
+    if (Math.abs(hot.ds - 1) > RULES.idle.footageMax + 1e-12 || Math.abs(hot.ds - lane.ds) > 1e-12) fails.push('footage breath not capped at footageMax');
+    const sh = { t0: 0, t1: 6, s0: 1.3, c0: [640, 360], idle: { ds: 0.05, ax: 12 } };
+    const rl = resolve(sh, 1.3, { footage: true }), rc = resolve(sh, 1.3, { footage: false });
+    if (near(rl.s, rc.s) || !near(rl.s, 1.3 * lane.ds)) fails.push('resolve does not scope the idle to the lane');
+    const L = lint([sh]); if (L.items.filter(x => x.rule === 'idle on footage').length !== 2) fails.push('lint: idle-on-footage warnings ' + JSON.stringify(L.items));
+    const Lc = lint([sh], { footage: false }); if (Lc.items.some(x => x.rule === 'idle on footage')) fails.push('lint flags a recreated idle');
+    const pz = clampPose({ s: 2, cx: 0, cy: 0 }); if (pz.cx !== 320 || pz.cy !== 180) fails.push('clampPose');
+    if (!near(nudge(1), 1) || nudge(0) !== 0 || whipBlur(1, 18) !== 0) fails.push('whip curve ends');
+    const lu = lint([{ t0: 0, t1: 6, moves: [{ t0: 1, dur: 1, s: 1.3, c: [640, 360], ease: 'power4.inOut' }] }]); if (lu.items.some(x => x.rule === 'unknown ease')) fails.push('lint rejects a grammar-table GSAP ease');
+    return { ok: !fails.length, fails, eases: Object.keys(EASE_GSAP).length, footageMax: RULES.idle.footageMax, footage: RULES.idle.footage };
+  }
+
+  const CAM = { RULES, EASE, EASE_GSAP, easeOf, knownEase, isFootage, EZ, EIO, P2, P3, P4, EXPO, P2IN, P3IN, P4IN, P2IO, P3IO, LIN,
     clampPose, pose, resolve, applyPose, movesOf, startPose,
     punchTo, punchOut, isPunch, fitScale, pushToFit, sourceWidth, upsample, maxScale, budget,
     nudge, whipBlur, whip, zoomThrough, connector, seam, seamCutAt, seamDur, applySeam, ensureStreakFilter,
     matchCut, toStage, velocityAt, velocityMatch, focus, rack, holePath, applyFocus, dolly, applyDolly, revealOut,
     followCaret, caretX, idle, withIdle, pushLong, hit, speed, streak, travelBlur, frameIdx, stepHold, seqSchedule,
-    verbOf, ladder, lint, trace };
+    verbOf, ladder, lint, trace, selftest };
   root.CAM = CAM;
-  if (typeof module !== 'undefined' && module.exports) { module.exports = CAM; if (require.main === module && process.argv.indexOf('--curves') > 0) cli(process.argv.slice(2)); }
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CAM;
+    if (require.main === module) {
+      const argv = process.argv.slice(2);
+      if (argv.indexOf('--selftest') >= 0) { const r = selftest(); process.stdout.write(JSON.stringify(r, null, 2) + '\n'); process.exit(r.ok ? 0 : 1); }
+      else if (argv.indexOf('--curves') >= 0) cli(argv);
+      else { process.stderr.write('usage: node camera.js --curves scenes/timing_<name>_data.js scenes/shots.js [broll/clips.js] [--out out] [--fps 30] | --selftest\n'); process.exit(2); }
+    }
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

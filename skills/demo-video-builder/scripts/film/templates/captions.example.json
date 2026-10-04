@@ -6,13 +6,15 @@
   "style:  anchor | broadcast | documentary | keynote | ink | conference | typewriter | clipwipe  (CAP.STYLES; table in references/captions-and-overlays.md)",
   "mode:   default fate of every phrase: rail (verbatim lane) | drop (not shown) | embed (big centred, one caption at a time)",
   "phases: per-phase fate or {fate, style, ink:'dark'|'light'} — e.g. drop the title phase whose words are already the title card",
-  "overrides: per-word tweaks keyed by phase + word (+ n-th occurrence): em (accent + weight 700), display (spoken 'twenty three' -> '23'),",
   "           drop (filler in a real-audio segment), color / weight / scale (scale <= 1.10 on the rail). No x/y nudges: they break the collision gate.",
   "grouping: optional overrides of the measured defaults (gap 0.35 s, commaGap 0.25 s, maxDur 2.5 s, minWords 2, minDur 0.5 s, lead 0.08 s, tail 0.6 s,",
   "           maxWords / maxChars default to the style's tokens; density:true lowers the cap to 2/3/4 words at > 3.5 / > 2.5 words per second)",
   "luma: optional probe result (python gates/overlay_gate.py --probe) {phase: {mean, p95}} -> dark ink on bright screens (> 150), bare light text (< 60), scrim between",
   "Everything here is fictional (Acme, synthetic data). Keep this file in qa.json 'authored' so display substitutions pass the hygiene / over-claims gates.",
-  "A phase whose words are already on screen (title card, closing card) is 'drop' - captioning it twice is the text-on-text failure the overlay gate flags."
+  "A phase whose words are already on screen (title card, closing card) is 'drop' - captioning it twice is the text-on-text failure the overlay gate flags.",
+  "v5 word-level styles: karaoke (the spoken word lights up: accent colour, bold cross-fade without reflow, 1.06 pulse) on the hero question and the quoted answer; kinetic (word waterfall in, block out) for recreated lines. Both keep the lane's wrap, position and one-group-at-a-time rule; tools/captions_ass.py writes the .ass/.srt/.vtt sidecars from the same groups (film.json captions.ass: true).",
+  "overrides: per-word tweaks keyed by phase + word (+ n-th occurrence): em (accent + weight 700), display (spoken 'twenty three' -> '23'), drop (filler in a real-audio segment), color / weight / scale (scale <= 1.10 on the rail). No x/y nudges: they break the collision gate.",
+  "Sample choices (craft review): 'ask' is drop because the typed question IS the caption (captioning it twice is text-on-text); karaoke lights the quoted answer only; the accent is spent once per beat, so no caption 'em' competes with the boxed row on the notebook beat; the 'ink' style (dark type on a light plate) takes over automatically where the probed lane luma is > 150."
  ],
  "style": "anchor",
  "mode": "rail",
@@ -24,9 +26,10 @@
  "creditKeepOut": 4.0,
  "phases": {
   "title": "drop",
+  "ask": "drop",
   "answer": {
    "fate": "rail",
-   "style": "typewriter"
+   "style": "karaoke"
   },
   "close": "drop"
  },

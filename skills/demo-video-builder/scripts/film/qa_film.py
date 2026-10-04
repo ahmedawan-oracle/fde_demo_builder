@@ -3,6 +3,7 @@
 
     node export_timeline.js scenes/timing_film_data.js scenes/shots.js     # writes out/timeline.json
     python qa_film.py                                                      # reads qa.json + film.json
+    python qa_film.py --profile=picture                                    # the look gates only (seams, motion, overlays, lint, canary, text) + CREDIT
 
   1  container        1920x1080, 30 fps CFR
   2  duration         film length = narration clock (+ tail)
@@ -18,7 +19,17 @@
  11  hygiene          no identifier pattern (emails, tokens, internal hosts, customer names) in authored text
  12  claims traced    every figure/claim the narration speaks is listed in claims.json with its on-screen source
  13  captions         SRT exists, ordered, ends inside the film
- 14+ plug-in gates   gates/*.py modules (seams, motion, overlays, audio, lint, canary, snapshots, ledger, text, grade)
+ 14+ plug-in gates   gates/*.py modules (seams, motion, overlays, audio, lint, canary, snapshots, ledger, text, grade,
+                      leaks; v5.1: hold_gate — recreated beats move first then hold, the hold window stays still ·
+                      look_gate — one look per shot type, no forbidden effect on a beat's look · pair_gate — start vs end
+                      frame of a recreated beat (anchors ≤ 2 px, words and names in the plan) · identity_gate — untouched
+                      shots render the same picture across a cut-list bump ·
+                      v5: chart_gate — every chart figure is a claims.json value · reveal_gate — hand-over on one
+                      frame, join invisible, lane frame equals the still · annotate_gate — marks on evidence, strokes
+                      clear of product text, glass budget, leak only in a seam window · skin_gate — brand_kit check on the
+                      active skin, scene tokens ⊆ skin, review sign-off · sfx_gate — no transient within 0.15 s of a
+                      loud word onset, one impact per act, stem level). Modules that read the mounted scene share one
+                      receipts probe (gates/_receipts.py -> out/scene_receipts.json, ~2 s).
  15  CREDIT           the mandatory "Crafted with FDE Demo Builder · by Ahmed Awan" line is on the end screen
 """
 import array, json, os, re, subprocess, sys
@@ -35,8 +46,12 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 
+RESULTS = []                                   # every gate verdict, written to out/qa_report.json for tools/review_pack.py
+
+
 def gate(name, ok, detail=''):
     print('  %-18s %s  %s' % (name, 'PASS' if ok else 'FAIL', detail))
+    RESULTS.append({'name': name, 'ok': bool(ok), 'detail': str(detail)})
     if not ok:
         fails.append(name)
 
@@ -62,7 +77,12 @@ d = dict(l.split('=', 1) for l in info.splitlines() if '=' in l)
 dur = float(d.get('duration', 0))
 gate('container', d.get('width') == '1920' and d.get('height') == '1080' and d.get('r_frame_rate') == '30/1'
      and d.get('r_frame_rate') == d.get('avg_frame_rate'), '%sx%s %s' % (d.get('width'), d.get('height'), d.get('r_frame_rate')))
-gate('duration', TOTAL - 0.1 <= dur <= TOTAL + 2.0, 'film %.2f s vs narration %.2f s' % (dur, TOTAL))
+# the render is TOTAL + TAIL (build_film.py TAIL: the closing card holds while the credit lands); allow that plus half a second
+try:
+    from build_film import TAIL as _TAIL
+except Exception:
+    _TAIL = 3.6
+gate('duration', TOTAL - 0.1 <= dur <= TOTAL + _TAIL + 0.5, 'film %.2f s vs narration %.2f s (+ %.1f s tail)' % (dur, TOTAL, _TAIL))
 
 m, sd = frame(0.45)[:2]
 gate('open frame', m > 12 or sd > 6, 'mean %.1f std %.1f' % (m, sd))
@@ -148,13 +168,28 @@ else:
 # Each module exposes GATE_NAMES and run(ctx) -> [(name, ok, detail)]. qa.json "gates" lists the modules to run
 # (default: every module in gates/). The mandatory CREDIT gate always runs last and cannot be disabled.
 import importlib, glob
-ctx = {'film': FILM, 'dur': dur, 'fps': FPS, 'timeline': TL, 'project': HERE, 'cfg': C, 'qa': Q, 'frame': frame,
+ctx = {'film': FILM, 'dur': dur, 'fps': FPS, 'timeline': TL, 'project': HERE, 'cfg': C, 'qa': Q, 'frame': frame, 'name': NAME,
+       'claims_json': cp,
        'scene_html': os.path.join(HERE, C.get('scene', 'scenes/film.html')), 'shots_js': os.path.join(HERE, 'scenes', 'shots.js'),
        'script': script, 'srt': SRT, 'vo_phases': json.load(open(os.path.join(HERE, 'vo', NAME + '_phases.json'))) if os.path.exists(os.path.join(HERE, 'vo', NAME + '_phases.json')) else None,
        'words': json.load(open(os.path.join(HERE, 'vo', NAME + '_words.json'))) if os.path.exists(os.path.join(HERE, 'vo', NAME + '_words.json')) else None}
 gdir = os.path.join(HERE, 'gates')
-wanted = Q.get('gates')
+# profiles: 'full' (default) runs every gates/*.py module; 'picture' runs the modules that decide whether the film
+# LOOKS right (seams, motion, overlays, lint, determinism, text, and the v5 layers: charts, reveals, annotations/glass/
+# light, skin — each < 10 s on the Acme sample) and skips the slower audit modules (audio, sfx, ledger, snapshots,
+# leak OCR, grade) — the inline picture/sound gates above and the CREDIT gate always run. `--profile picture` or
+# qa.json "profile". Order matters only for the printout; the CREDIT gate is always last.
+PROFILES = {'picture': ['seam_gate', 'motion_diag', 'hold_gate', 'look_gate', 'overlay_gate', 'lint_scene', 'canary', 'text_gate',
+                        'chart_gate', 'reveal_gate', 'annotate_gate', 'skin_gate'],
+            'full': None}
+prof = next((a.split('=', 1)[1] for a in sys.argv[1:] if a.startswith('--profile=')), None) or Q.get('profile', 'full')
+if prof not in PROFILES:
+    print('unknown profile %r (picture | full)' % prof); sys.exit(2)
+wanted = Q.get('gates') if Q.get('gates') is not None else PROFILES[prof]
 mods = wanted if wanted is not None else sorted(os.path.splitext(os.path.basename(f))[0] for f in glob.glob(os.path.join(gdir, '*.py')) if not os.path.basename(f).startswith('_'))
+if PROFILES[prof] is not None:
+    mods = [m for m in mods if os.path.exists(os.path.join(gdir, m + '.py'))]
+    print('profile %s: %d gate modules (%s)' % (prof, len(mods), ', '.join(mods)))
 if mods:
     sys.path.insert(0, gdir)
     for mname in mods:
@@ -168,5 +203,11 @@ if mods:
 import credit as CR
 gate('CREDIT', CR.check(FILM, verbose=False), '"%s" on the end screen (mandatory)' % CR.CREDIT_TEXT)
 
+try:
+    os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)
+    json.dump({'film': os.path.relpath(FILM, HERE), 'profile': prof, 'gates': RESULTS, 'failed': fails},
+              open(os.path.join(HERE, 'out', 'qa_report.json'), 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
+except Exception as e:                        # the report is a convenience; the verdict below is the contract
+    print('  (qa_report.json not written: %s)' % e)
 print('\n%s  (%d failed)' % ('ALL GATES PASS' if not fails else 'FAILED: ' + ', '.join(fails), len(fails)))
 sys.exit(1 if fails else 0)

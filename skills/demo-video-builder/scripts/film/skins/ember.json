@@ -1,0 +1,211 @@
+{
+ "name": "ember",
+ "label": "Ember",
+ "when_to_use": "Event sizzles and booth trailers: warm near-black ground, ember orange focal colour, keynote captions, high energy.",
+ "background": "dark",
+ "mood": "friendly",
+ "tokens": {
+  "paper": {
+   "type": "color",
+   "default": "#1A0F0D",
+   "role": "style",
+   "description": "stage background (top of the gradient)"
+  },
+  "paper2": {
+   "type": "color",
+   "default": "#2F211F",
+   "role": "style",
+   "description": "stage background (bottom of the gradient)"
+  },
+  "ink": {
+   "type": "color",
+   "default": "#F6E8DC",
+   "role": "style",
+   "description": "title and lower-third text"
+  },
+  "ink-soft": {
+   "type": "color",
+   "default": "#E8DBC6",
+   "role": "style",
+   "description": "subtitle text"
+  },
+  "muted": {
+   "type": "color",
+   "default": "#C6A39E",
+   "role": "style",
+   "description": "caption line, lower-third label, glow"
+  },
+  "accent": {
+   "type": "color",
+   "default": "#FF7A3D",
+   "role": "style",
+   "description": "rule, highlight boxes, lower-third edge — one focal element per beat"
+  },
+  "gold": {
+   "type": "color",
+   "default": "#FFC46B",
+   "role": "style",
+   "description": "first line of the closing card"
+  },
+  "black": {
+   "type": "color",
+   "default": "#130401",
+   "role": "style",
+   "description": "head fade plate"
+  },
+  "title-font": {
+   "type": "font",
+   "default": "\"Segoe UI\", Arial, sans-serif",
+   "role": "style",
+   "description": "title + closing card face (local system family)"
+  },
+  "body-font": {
+   "type": "font",
+   "default": "\"Segoe UI\", Arial, sans-serif",
+   "role": "style",
+   "description": "subtitles, captions, lower-thirds"
+  },
+  "title-size": {
+   "type": "number",
+   "default": 64,
+   "min": 44,
+   "max": 84,
+   "step": 2,
+   "unit": "px",
+   "role": "layout",
+   "description": "title h1 size on the 1280x720 stage"
+  },
+  "title": {
+   "type": "string",
+   "default": "Monday, answered.",
+   "role": "content",
+   "portrays": [
+    "subject_tagline"
+   ],
+   "binds": "#tTitle"
+  },
+  "subtitle": {
+   "type": "string",
+   "default": "From an analyst’s notebook to a question anyone can ask",
+   "role": "content",
+   "portrays": [
+    "subject_tagline"
+   ],
+   "binds": "#tSub"
+  },
+  "caption": {
+   "type": "string",
+   "default": "Fictional company · synthetic data",
+   "role": "content",
+   "portrays": [
+    "authority_badge"
+   ],
+   "binds": "#tCap",
+   "description": "the honesty line; keep it unless the film shows a real customer’s own data with their approval"
+  },
+  "logo": {
+   "type": "image",
+   "default": null,
+   "role": "content",
+   "portrays": [
+    "subject_logo"
+   ],
+   "binds": "#logo",
+   "description": "local file inside the project (assets/…); null hides the slot"
+  },
+  "density": {
+   "type": "enum",
+   "default": "booth",
+   "options": [
+    "booth",
+    "desk"
+   ],
+   "role": "layout",
+   "description": "booth = larger type, fewer words on screen"
+  }
+ },
+ "forbidden_tokens": [
+  "narration",
+  "fps",
+  "width",
+  "height",
+  "total",
+  "codec",
+  "credit"
+ ],
+ "css_snippet": ":root{--paper:#1A0F0D;--paper2:#2F211F;--ink:#F6E8DC;--ink-soft:#E8DBC6;--muted:#C6A39E;--accent:#FF7A3D;--gold:#FFC46B;--black:#130401;--title-font:\"Segoe UI\", Arial, sans-serif;--body-font:\"Segoe UI\", Arial, sans-serif;--title-size:64px}",
+ "type": {
+  "mood": "friendly",
+  "display": "Segoe UI",
+  "body": "Segoe UI",
+  "mono": "Consolas",
+  "display_weight": 700,
+  "display_file": "segoeuib.ttf",
+  "body_file": "segoeui.ttf",
+  "body_bold_file": "segoeuib.ttf",
+  "mono_file": "consola.ttf",
+  "title_css": "\"Segoe UI\", Arial, sans-serif",
+  "body_css": "\"Segoe UI\", Arial, sans-serif",
+  "mono_css": "Consolas, \"Courier New\", monospace",
+  "sizes_stage_px": {
+   "title": 64,
+   "subtitle": 22,
+   "body": 22,
+   "label": 13,
+   "mono": 18
+  }
+ },
+ "motion": {
+  "profile": "high",
+  "enter_s": 0.25,
+  "exit_s": 0.2,
+  "stagger_total_s": 0.4,
+  "per_item_s": 0.04,
+  "push_s": 0.9,
+  "push_scale": [
+   1.5,
+   2.0
+  ],
+  "hold_s": 1.5,
+  "first_motion_s": 0.15,
+  "offset_after_cut_s": 0.1,
+  "rack_focus_min_gap_s": 8.0,
+  "eases": {
+   "enter": "expo.out",
+   "exit": "power3.in",
+   "push": "sine.out",
+   "pan": "sine.inOut"
+  }
+ },
+ "captions": {
+  "style": "keynote",
+  "ink": "light"
+ },
+ "seams": {
+  "current": "x-1",
+  "allowed": [
+   "cut-the-curve",
+   "zoom-through",
+   "waterfall"
+  ],
+  "max_techniques": 3
+ },
+ "brand": {
+  "source": "composed from hand-picked colours",
+  "given": {
+   "paper": "#1A0F0D",
+   "ink": "#F6E8DC",
+   "accent": "#FF7A3D",
+   "gold": "#FFC46B"
+  }
+ },
+ "contrast": {
+  "ink": 15.65,
+  "ink-soft": 13.76,
+  "muted": 8.17,
+  "accent": 7.25,
+  "gold": 11.95,
+  "paper2": 1.21
+ },
+ "generated_by": "tools/brand_kit.py (deterministic: same inputs → identical file)"
+}

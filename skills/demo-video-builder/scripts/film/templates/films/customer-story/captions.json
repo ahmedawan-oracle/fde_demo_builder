@@ -1,0 +1,34 @@
+{
+ "_doc": [
+  "captions.json for the customer-story template -> copy to scenes/captions.json (new-film does this).",
+  "Lane style ink (the skin's captions.style: skins/paper.json - dark ink on the light paper); the hero question in karaoke;",
+  "no kinetic in a story; title, turn, change and close cards drop (their words are already on screen).",
+  "Real beats carry a lower third (OVL.lowerThird) - the lane lifts above a visible lower third by itself.",
+  "Everything here is fictional (Acme). Keep this file in qa.json 'authored'."
+ ],
+ "template": "customer-story",
+ "style": "ink",
+ "mode": "rail",
+ "burn": true,
+ "stage": [1280, 720],
+ "creditKeepOut": 4.0,
+ "phases": {
+  "open": "drop",
+  "before": {"fate": "rail", "style": "ink", "ink": "dark"},
+  "turn": "drop",
+  "work": {"fate": "rail", "style": "ink", "ink": "dark"},
+  "ask": {"fate": "rail", "style": "karaoke", "ink": "dark"},
+  "answer": {"fate": "rail", "style": "ink", "ink": "dark"},
+  "change": "drop",
+  "today": {"fate": "rail", "style": "ink", "ink": "dark"},
+  "close": "drop"
+ },
+ "overrides": [],
+ "grouping": {
+  "gap": 0.35,
+  "maxDur": 2.5,
+  "tail": 0.6,
+  "maxWords": 6,
+  "maxChars": 42
+ }
+}

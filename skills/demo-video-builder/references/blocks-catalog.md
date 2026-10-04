@@ -5,7 +5,10 @@ block is `BL.<name>.build(host, opts) → state` once, then `BL.<name>.draw(stat
 the scene's `frame(t)`; `BL.<name>.calc(t, opts)` is the pure core. No CSS transitions, no rAF, no wall-clock,
 no `Math.random` (seeded LCG only). Times are **absolute film seconds** — pass `wt(phase, word)` values.
 `BL.installStyles(tokens?)` injects the default `.bl-*` stylesheet once (override in the scene).
-Example scene: `scripts/film/scenes_blocks_demo.html` (four blocks + a flash on a 10 s clock, fictional Acme).
+Example scene: `scripts/film/scenes_blocks2_demo.html` (fictional Acme). **v5:** the trailer blocks were rebuilt on
+`lib/motion.js` as `lib/blocks2.js` (`BL2`: countUp, decisionCard, receipt, twoLayers, sceneCards, chatReveal,
+approvalCard, flash — `story-blocks.md`); here `titleLockup` delegates to `TYPO.lockup`, `kpi` / `count` to
+`BL2.countUp` and `flash` to `BL2.flash` with their v4 signatures kept. The rest of this catalog is unchanged.
 
 ## The envelope law (shared by every block)
 

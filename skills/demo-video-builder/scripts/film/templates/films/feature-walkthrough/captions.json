@@ -1,0 +1,34 @@
+{
+ "_doc": [
+  "captions.json for the feature-walkthrough template -> copy to scenes/captions.json (new-film does this).",
+  "Lane style broadcast (the skin's captions.style: skins/meridian-dark.json); the chapter lines (hook, recap) kinetic; the hero",
+  "question of feature one karaoke; result cards and the title/close drop (their words are already on screen).",
+  "The keystroke pill (lib/hud.js) sits at bottom 170 stage px, the lane below it: keep maxWords 6 so neither crowds the other.",
+  "Everything here is fictional (Acme). Keep this file in qa.json 'authored'."
+ ],
+ "template": "feature-walkthrough",
+ "style": "broadcast",
+ "mode": "rail",
+ "burn": true,
+ "stage": [1280, 720],
+ "creditKeepOut": 4.0,
+ "phases": {
+  "hook": {"fate": "rail", "style": "kinetic"},
+  "title": "drop",
+  "f1": {"fate": "rail", "style": "karaoke"},
+  "r1": "drop",
+  "f2": {"fate": "rail", "style": "broadcast"},
+  "r2": "drop",
+  "f3": {"fate": "rail", "style": "broadcast"},
+  "recap": {"fate": "rail", "style": "kinetic"},
+  "close": "drop"
+ },
+ "overrides": [],
+ "grouping": {
+  "gap": 0.35,
+  "maxDur": 2.5,
+  "tail": 0.6,
+  "maxWords": 6,
+  "maxChars": 40
+ }
+}

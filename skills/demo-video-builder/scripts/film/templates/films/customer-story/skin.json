@@ -1,0 +1,17 @@
+{
+ "_doc": [
+  "skin.json for the customer-story template: a POINTER, not a skin. new-film writes `skin` into film.json \"skin\"; build_film.py",
+  "then runs tools/skin_apply.py (scenes/skin_data.js + design.md tokens) before the lint and the render.",
+  "Paper: warm paper ground, serif display, oxblood accent, calm motion profile, ink captions - a story watched in a bright room.",
+  "LIGHT GROUND: the skin's black token equals its paper, so the scene's #black plate (var(--black)) opens the film from the",
+  "paper, never from a dark flash; build_film.py checks the first rendered frame against it and export.py dips the booth loop to it.",
+  "Noir is the dark alternative (same calm profile, documentary captions)."
+ ],
+ "template": "customer-story",
+ "skin": "skins/paper.json",
+ "alternatives": {
+  "dark": "skins/noir.json",
+  "light-technical": "skins/mint-ledger.json"
+ },
+ "head_fade": "light skin: the plate is the paper (#F4F1EA); switch to noir and it is near-black again - nothing in the scene changes"
+}

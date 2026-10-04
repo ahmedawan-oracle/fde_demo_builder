@@ -15,6 +15,8 @@ Gates (names <= 18 chars):
                             frame's own content (frame k warped by the scripted scale/shift; only judged when the
                             expected change is >= 0.3 %) -> the camera did nothing
                       FAIL  > 4 % change with no camera, no scheduled motion and no cut within 0.15 s -> unscripted motion
+                      (scheduled = the shot's own windows, qa.json motion.allow, every seam window in out/timeline.json
+                      and every shader seam window [at, at + dur] from its glSeams)
                       WARN  a velocity discontinuity in the scripted curve (> 3x its neighbours) not at a cut
                     Also recovers the camera from the pixels (Fourier-Mellin scale + phase-correlation shift
                     between consecutive frames) and writes out/qa/camera_measured.json for the editor.
@@ -32,6 +34,16 @@ qa.json keys (all optional):
     "zoom_max": 2.0, "zoom_warn": 1.6,
     "motion": {"fps": 10, "min_change": 0.3, "max_unscripted": 4.0, "disc_ratio": 3.0, "cam_min": 1.0,
                "cut_pad": 0.15, "noise": 0.25, "samples": 9, "allow": [[t0, t1], ...]}
+
+Scans (v5.1) — the failures a frame-by-frame eye catches and a mean does not:
+    --spikes <film>                   isolated frame-difference outliers: one 0.1 s step whose change is > 4x both of its
+                                      neighbours and > 2 % (a single-frame jump, a dropped or doubled frame, a glitch) away from
+                                      any cut; reported as WARN inside `motion traced` and listed by this flag
+    --pan-halves <film> [t0 t1]       the camera recovered on the LEFT and the RIGHT half of the frame separately: a real pan or
+                                      push moves both halves the same way; a disagreement (> 1.5 px shift or > 0.01 scale with one
+                                      half moving) is a partial pan — one element moved, not the camera
+    --roster <start.jpg> <end.jpg>    OCR the two stills (the leak gate's engine) and compare their named entities (Title-case
+                                      words): who arrived, who left — the people-roster mismatch start → end
 
 Self-test (synthetic frames, no ffmpeg, < 10 s):   python gates/motion_diag.py --selftest
 """
@@ -204,15 +216,69 @@ def estimate_motion(a, b):
     return scale, -dx, -dy, pk          # phase_corr reports where a sits in b; we want b's motion
 
 
+# ---------------------------------------------------------------- scans (v5.1)
+def spikes(frames, fps, cuts=(), thr=2.0, ratio=4.0, cut_pad=0.15):
+    """[(t, pct, before, after)] single-frame jumps: frame k+1 differs from both neighbours by > thr while frames k and k+2 are
+    nearly the same picture (their difference < pct / ratio) — the picture jumped and came back. Plus the plain isolated
+    outlier (one step > ratio x both of its neighbours) for a dropped or doubled frame. Steps touching a cut are skipped."""
+    ch = [change_pct(frames[k], frames[k + 1]) for k in range(len(frames) - 1)]
+    out = []
+    for k in range(1, len(ch) - 1):
+        a, b = k / fps, (k + 1) / fps
+        if any(abs(c - a) < cut_pad or abs(c - b) < cut_pad for c in cuts):
+            continue
+        back = change_pct(frames[k], frames[k + 2])
+        if ch[k] > thr and ch[k + 1] > thr and back < max(0.5, ch[k] / ratio):
+            out.append((round(b, 2), round(ch[k], 2), round(ch[k - 1], 2), round(ch[k + 1], 2))); continue
+        nb = max(ch[k - 1], ch[k + 1])
+        if ch[k] > thr and ch[k] > ratio * nb + 0.2:
+            out.append((round(a, 2), round(ch[k], 2), round(ch[k - 1], 2), round(ch[k + 1], 2)))
+    return out
+
+
+def pan_halves(a, b, shift_tol=1.5, scale_tol=0.01, still=0.3):
+    """camera recovered on the left and the right half separately → {'left': (s, dx, dy), 'right': (...), 'disagree': bool}."""
+    w = a.shape[1] // 2
+    L = estimate_motion(a[:, :w], b[:, :w])[:3]
+    R = estimate_motion(a[:, w:], b[:, w:])[:3]
+    moving = max(abs(L[1]), abs(L[2]), abs(R[1]), abs(R[2])) > still or abs(L[0] - 1) > 0.003 or abs(R[0] - 1) > 0.003
+    dis = moving and (abs(L[1] - R[1]) > shift_tol or abs(L[2] - R[2]) > shift_tol or abs(L[0] - R[0]) > scale_tol)
+    return {'left': tuple(round(float(x), 3) for x in L), 'right': tuple(round(float(x), 3) for x in R), 'disagree': bool(dis)}
+
+
+def pan_halves_film(film, t0, t1, fps=10, res=(320, 180)):
+    """[(t, left, right, disagree)] over [t0, t1] at `fps`."""
+    fr = decode_gray(film, fps, res, t0, max(0.2, t1 - t0))
+    return [(round(t0 + k / fps, 2),) + tuple(pan_halves(fr[k], fr[k + 1])[x] for x in ('left', 'right', 'disagree')) for k in range(len(fr) - 1)]
+
+
+def roster(start_path, end_path, backend='auto'):
+    """named entities on two stills via the leak gate's OCR → {'start', 'end', 'new', 'gone', 'engine'} (or {'note'} without an engine)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, here)
+    import leak_gate as LG, pair_gate as PG
+    be, note = LG.pick_backend(backend, fastest=True)
+    if be is None:
+        return {'note': 'no OCR engine: ' + note[:80]}
+    sw, ew = PG.ocr_words(be, start_path), PG.ocr_words(be, end_path)
+    rs, re_ = PG.roster(sw), PG.roster(ew)
+    return {'start': sorted(rs), 'end': sorted(re_), 'new': sorted(re_ - rs), 'gone': sorted(rs - re_), 'engine': be.name}
+
+
 # ---------------------------------------------------------------- the gates
 def gate_motion(ctx, cfg, curves, frames, report=None):
     fps, FPS = cfg['fps'], curves['fps']
     cuts = list(curves.get('cuts', [])) + [s['t0'] for s in curves['shots']] + [s['t1'] for s in curves['shots']]
     allow_global = list(curves.get('allow', [])) + [list(map(float, w)) for w in (cfg.get('allow') or [])]
     # seams declared in seams.json move both sides on purpose: their windows (out/timeline.json) are scheduled motion
-    for w in (ctx.get('timeline') or {}).get('seams', []) or []:
+    TLx = ctx.get('timeline') or {}
+    for w in TLx.get('seams', []) or []:
         if isinstance(w, dict) and 't0' in w and 't1' in w:
             allow_global.append([float(w['t0']) - 0.05, float(w['t1']) + 0.05])
+    # shader seams (type 'gl'): GL.cutTransition repaints the whole stage inside [at, at + dur] — scheduled like any seam
+    for g in TLx.get('glSeams', []) or []:
+        if isinstance(g, dict) and 'at' in g and 'dur' in g:
+            allow_global.append([float(g['at']) - 0.05, float(g['at']) + float(g['dur']) + 0.05])
     dead, wild, disc, measured = [], [], [], []
     ladders = (report or {}).get('ladders', []) if report else []
     # optional masks: stage-px rects of recreated screen-space overlays (lower thirds, caption lane) ignored in both
@@ -313,6 +379,9 @@ def gate_motion(ctx, cfg, curves, frames, report=None):
         parts.append('%d shots traced' % len(measured))
     if disc:
         parts.append('WARN velocity jumps %s' % disc[:3])
+    sp = spikes(frames, fps, cuts, cut_pad=cfg['cut_pad'])
+    if sp:
+        parts.append('WARN single-frame spikes (t, %%, before, after) %s' % sp[:3])
     if corrs:
         parts.append('pixel/script ds corr %.2f' % (sum(corrs) / len(corrs)))
     return ('motion traced', ok, '; '.join(parts))
@@ -378,6 +447,17 @@ def gate_seq(ctx, cfg, report, frames_fn):
     d = ('stutter (shot, [(source frame, shown n)]) %s' % bad[:3]) if bad else '%d seq clip(s) step cleanly' % len(S)
     if frozen:
         d += '; identical output frames inside the motion window %s (shot, n, of)' % frozen[:3]
+    # speed contrast (motion-doctrine.md): the playback rate of every real-motion shot, so the editor sees the film's speed
+    # ladder at a glance — product footage reads best at 1.3–1.5x, people at ~0.8x, and a film with every clip at 1.0x has no
+    # contrast. Reported, never failed; a rate outside 0.5–2.0 is a WARN (slower reads as a stall, faster as a glitch).
+    rates = [(s['shot'], s['rate'] if isinstance(s.get('rate'), (int, float)) else 'lane') for s in S]
+    wild = [(sh, r) for sh, r in rates if isinstance(r, (int, float)) and not (0.5 <= r <= 2.0)]
+    d += '; playback rates %s' % ', '.join('%s %sx' % (sh, ('%.2f' % r) if isinstance(r, (int, float)) else r) for sh, r in rates[:6])
+    if wild:
+        d += '; WARN rate outside 0.5–2.0x %s' % wild[:3]
+    nums = [r for _, r in rates if isinstance(r, (int, float))]
+    if len(nums) >= 2 and max(nums) - min(nums) < 1e-6:
+        d += '; WARN every clip at %.2fx — no speed contrast' % nums[0]
     return ('seq quantized', ok, d)
 
 
@@ -524,6 +604,17 @@ def selftest():
     c0 = change_pct(img, img)
     c1 = change_pct(img, _warp(img, 1.0, 3, 0))
     t('change % still 0 / 3 px pan > 0.3 %', c0 == 0.0 and c1 > 0.3, '%.3f / %.2f' % (c0, c1))
+    # v5.1 scans
+    seq = [img] * 12
+    seq[6] = _warp(img, 1.0, 9, 0)                                              # one frame jumps and comes back
+    sp = spikes(seq, 10, cuts=[])
+    t('spikes: a one-frame jump is caught, nothing else', len(sp) == 1 and sp[0][0] == 0.6 and sp[0][1] > 2.0, str(sp))
+    t('spikes: a cut nearby is not a spike', spikes(seq, 10, cuts=[0.55]) == [], '')
+    half = img.copy(); half[:, :160] = _warp(img, 1.0, 5, 0)[:, :160]           # only the left half moved
+    ph = pan_halves(img, half)
+    pw = pan_halves(img, _warp(img, 1.0, 5, 0))
+    t('pan halves: a partial pan disagrees, a whole-frame pan agrees', ph['disagree'] and not pw['disagree'] and abs(pw['left'][1] - 5) < 1.0 and abs(pw['right'][1] - 5) < 1.0, '%s / %s' % (ph, pw))
+    t('pan halves: a still frame agrees', not pan_halves(img, img.copy())['disagree'])
 
     # motion-traced decision logic on a synthetic film: shot 0..3 s, a scripted push at 1..2 s, frames at 10 fps
     fps, FPS = 10, 30
@@ -554,6 +645,9 @@ def selftest():
     frames3[26] = 255 - frames3[26]
     name, ok, d = gate_motion(ctx, cfg, curves, frames3, rep0)
     t('unscripted motion detected', not ok and 'unscripted' in d, d[:90])
+    # the same change inside a shader seam window (out/timeline.json glSeams) is scheduled motion too
+    name, ok, d = gate_motion(dict(ctx, timeline={'glSeams': [{'id': 'gl', 'at': 2.45, 'dur': 0.3, 'name': 'chromaSplit'}]}), cfg, curves, frames3, rep0)
+    t('gl seam window is scheduled motion', ok, d[:90])
     # the same change inside an allowance window (a scheduled scroll) is fine
     curves['shots'][0]['windows']['scroll'] = [[2.4, 2.7]]
     name, ok, d = gate_motion(ctx, cfg, curves, frames3, rep0)
@@ -604,6 +698,28 @@ def selftest():
 
 
 if __name__ == '__main__':
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if '--spikes' in sys.argv:
+        film = sys.argv[sys.argv.index('--spikes') + 1]
+        fr = decode_gray(film, 10, (320, 180))
+        sp = spikes(fr, 10)
+        for t_, pct, a, b in sp:
+            print('  spike  %7.2f s  %.2f %%  (neighbours %.2f / %.2f)' % (t_, pct, a, b))
+        print('%d single-frame spike(s) in %s' % (len(sp), os.path.basename(film))); sys.exit(1 if sp else 0)
+    if '--pan-halves' in sys.argv:
+        i = sys.argv.index('--pan-halves'); film = sys.argv[i + 1]
+        t0 = float(sys.argv[i + 2]) if len(sys.argv) > i + 2 else 0.0
+        t1 = float(sys.argv[i + 3]) if len(sys.argv) > i + 3 else t0 + 3.0
+        rows = pan_halves_film(film, t0, t1)
+        bad = [r for r in rows if r[3]]
+        for t_, L, R, dis in rows:
+            print('  %7.2f s  left s %.3f dx %+.1f dy %+.1f   right s %.3f dx %+.1f dy %+.1f%s' % (t_, L[0], L[1], L[2], R[0], R[1], R[2], '   PARTIAL' if dis else ''))
+        print('%d/%d intervals where the halves disagree (partial pan)' % (len(bad), len(rows))); sys.exit(1 if bad else 0)
+    if '--roster' in sys.argv:
+        i = sys.argv.index('--roster')
+        r = roster(sys.argv[i + 1], sys.argv[i + 2])
+        print(json.dumps(r, indent=1, ensure_ascii=False)); sys.exit(1 if r.get('new') or r.get('gone') else 0)
     if '--selftest' in sys.argv:
         sys.exit(selftest())
     print(__doc__)

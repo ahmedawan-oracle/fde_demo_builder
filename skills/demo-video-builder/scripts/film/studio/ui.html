@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>FDE Demo Builder — Studio</title>
+<!--
+  ui.html — the preview studio page served by tools/studio.py at http://127.0.0.1:8765/.
+  The scene (scenes/film.html) runs in the iframe below at its authoring size, 1280x720, CSS-scaled to fit;
+  studio.js drives the iframe's own window.__seek / window.__step from the timeline, so the picture is the
+  scene's own pure frame(t) — the same function the renderer calls. Guides are siblings of the iframe (never
+  inside the scene). No external assets: every colour is a house token, every glyph a system font.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/studio/studio.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="dot"></span>Studio <span class="proj" id="projName">—</span></div>
+  <div class="hud">
+    <span class="hud-item"><label>t</label><b id="hudT">0.000</b><small>s</small></span>
+    <span class="hud-item"><label>frame</label><b id="hudF">0</b><small id="hudN">/ 0</small></span>
+    <span class="hud-item"><label>phase</label><b id="hudPhase">—</b></span>
+    <span class="hud-item"><label>beat</label><b id="hudBeat">—</b></span>
+    <span class="hud-item"><label>camera</label><b id="hudCam">1.00×</b></span>
+    <span class="hud-item"><label>seam</label><b id="hudSeam">—</b></span>
+  </div>
+  <div class="actions">
+    <button id="btnPlay" title="space">Play</button>
+    <button id="btnTap" title="T — 1920x1080 still through the renderer">Tap</button>
+    <button id="btnQA" title="Q — gates/lint_scene.py">QA quick</button>
+    <button id="btnGuides" class="toggle on" title="G">Guides</button>
+    <button id="btnReload" title="R — reload the scene at this t">Reload</button>
+  </div>
+</header>
+
+<main id="main">
+  <section id="stageWrap">
+    <div id="stageBox">
+      <iframe id="scene" title="scene" scrolling="no"></iframe>
+      <div id="guides" aria-hidden="true">
+        <div class="g action" id="gAction"><span>action safe</span></div>
+        <div class="g title" id="gTitle"><span>title safe</span></div>
+        <div class="g caption" id="gCaption"><span>caption lane</span></div>
+        <div class="g cross"></div>
+      </div>
+      <div id="toast"></div>
+    </div>
+    <div id="guideBar">
+      <label><input type="checkbox" id="ckTitle" checked> title safe</label>
+      <label><input type="checkbox" id="ckAction" checked> action safe</label>
+      <label><input type="checkbox" id="ckCaption" checked> caption lane</label>
+      <label><input type="checkbox" id="ckCross"> centre</label>
+      <label><input type="checkbox" id="ckNocap"> captions off (&amp;nocap)</label>
+      <span class="spacer"></span>
+      <span class="hint">← → 1 frame · shift 10 · space play · Home/End · T tap · Q qa · G guides · R reload</span>
+    </div>
+  </section>
+
+  <aside id="side">
+    <h3>Words</h3>
+    <div id="words" class="panel words"></div>
+    <h3>Taps <small id="tapStatus"></small></h3>
+    <div id="taps" class="panel taps"></div>
+    <h3>QA quick <small id="qaStatus"></small></h3>
+    <div id="qa" class="panel qa"><div class="muted">Press Q or the button: static determinism / seekability / font / markup scan of the scene.</div></div>
+    <h3>Changes</h3>
+    <div id="changes" class="panel changes"><div class="muted">Watching scenes/**, lib/**, timing*.js, seams.json, STORYBOARD.md every 500 ms.</div></div>
+  </aside>
+</main>
+
+<footer id="timelineWrap">
+  <canvas id="timeline"></canvas>
+  <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="scrub">
+</footer>
+
+<script src="/studio/studio.js"></script>
+</body></html>

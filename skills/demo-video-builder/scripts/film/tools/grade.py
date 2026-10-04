@@ -292,7 +292,7 @@ def summarize(frames):
 
 
 def suggest(m, ui=True):
-    """Bounded starting correction from the measured 8-bit YUV stats (the analyzer thresholds, re-expressed).
+    """Bounded starting correction from the measured 8-bit YUV stats.
     ui=True (product footage): highlight-clip risk is reported, not corrected, and the product limits apply."""
     lim = lambda k, v: max(-LIMITS.get(k, 1.0), min(LIMITS.get(k, 1.0), v))
     avg, lo, hi = m['YAVG'] / 255.0, m['YLOW'] / 255.0, m['YHIGH'] / 255.0

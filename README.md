@@ -22,17 +22,20 @@ Given one screen recording, the pipeline:
 Everything is driven by a single `demo_config.py` (one source of truth for beats + narration) and two
 scripts (`gen_vo.py`, `build.py`). It's fully reproducible: change the config, re‑run.
 
-## Prerequisites
+## Requirements
 
 | Tool | Why | Check |
 |---|---|---|
-| **ffmpeg / ffprobe** (≥ 6) | all video assembly | `ffmpeg -version` |
-| **Python** (≥ 3.10) + **edge-tts** | narration | `pip install edge-tts` |
-| **Node.js** (≥ 18) + **puppeteer** (+ **puppeteer-screen-recorder** for v1/v2 bookends) | v3 film render; animated opener/outro | `npm i puppeteer puppeteer-screen-recorder` |
-| **Pillow** + **numpy** | mandatory credit stamp; v3 clip extraction | `pip install pillow numpy` |
-| *(optional)* **faster-whisper** | word‑timestamps to sync opener beats to VO | `pip install faster-whisper` |
+| **ffmpeg / ffprobe** (≥ 6, built with libx264, aac and libass) | all video assembly, loudness, caption burn-in | `ffmpeg -version`, `ffmpeg -filters \| grep ass` |
+| **Python** (≥ 3.10) + `pip install -r requirements.txt` (edge-tts, Pillow, numpy, **scipy** — hard: SFX synth, voice chain, cursor tracking, idle detection, the leak gate's avatar detector) | narration, extraction, gates, tools | `python tools/doctor.py` (checks scipy too) |
+| **Node.js** (≥ 18) + `npm i puppeteer gsap three d3-delaunay` | the deterministic render; the v5 picture libraries, loaded from the project's `node_modules` by relative path (never a CDN) | `tools/doctor.py` → `node libs` |
+| *(optional)* `winocr` — **preferred on Windows** (the OS engine: 0.3–0.5 s per frame, 60–100× faster than the bundled model at equal recall) — or `rapidocr-onnxruntime opencv-python-headless onnxruntime` elsewhere | OCR in the leak gate; without an engine the gate warns and still runs its pattern, denylist and badge detectors | `python gates/leak_gate.py --selftest` |
+| *(optional)* `faster-whisper`, `puppeteer-screen-recorder` | v1/v2 word timestamps and bookends | |
 
-A **1920×1080** source recording is assumed throughout (adjust coords if yours differs).
+A **1920×1080** source recording is assumed throughout (adjust coords if yours differs). Renders run on
+Chrome's software GL path by default so the frames are identical on every machine; `RENDER_GL=hardware` is
+for previews. Windows 10/11 fonts (Georgia, Cambria, Segoe UI, Arial, Consolas, Bahnschrift) are the skins'
+local pairings; `tools/fonts_localize.py --local` keeps a public project free of font files.
 
 ## Install (as a Claude Code plugin)
 
@@ -48,12 +51,73 @@ Once installed you get:
 - **Skill** `demo-video-builder` — the full methodology; Claude follows it when you ask to build a demo video.
 - **Command** `/fde-demo-builder:new-demo <name>` — scaffolds a new demo project (scripts + starter config).
 - **Command** `/fde-demo-builder:new-broll <name>` — *(v2)* scaffolds a story-rebuild project (b-roll scenes + multi-voice).
-- **Command** `/fde-demo-builder:new-film <name>` — *(v3)* scaffolds a production film (real-pixel footage, narration clock, 14 QA gates).
-- **Agent** `demo-qa-reviewer` — adversarially QAs a finished video (privacy, VO‑sync, readability, playback, credit).
+- **Command** `/fde-demo-builder:new-film <name>` — *(v3–v5)* scaffolds a production film: BRIEF → look pass →
+  STORYBOARD → sketch → lock → build → QA → studio taps → review pack → export.
+- **Agent** `demo-qa-reviewer` — adversarially QAs a finished video (privacy, footage honesty, chart truth, VO‑sync, credit).
 
 > **Mandatory credit.** Every video built with this plugin ends with a small centred footer line on the end
 > screen — *Crafted with FDE Demo Builder · by Ahmed Awan*. The build scripts stamp and verify it
 > automatically; QA fails any video without it. Please keep it.
+
+## v5 — The picture layer
+
+Version 5 is about what the viewer sees. Every device runs on the narration clock, never touches a product pixel
+and renders byte-identically on software GL. Read [picture-doctrine](skills/demo-video-builder/references/picture-doctrine.md) first.
+
+- **Motion and type on the clock** — GSAP timelines mounted paused and set per frame; words arrive as they are
+  spoken, a phrase swaps with a match cut, one hero word, one slam, glyph soup resolving into a headline.
+- **Transitions you can defend** — seven WebGL2 cuts (chroma split, ink dissolve, light leak, white hit, iris,
+  slit scan, cross warp) declared in `seams.json`, ≤ 0.5 s over footage, never between two product screens.
+- **3D titles** — a headline cut into glass shards that fly in from depth and past the lens; an outline that
+  assembles from pieces; a card stack the camera dollies through (105 ms/frame with 4× MSAA on software GL).
+- **Story blocks, charts, comparisons** — a count-up that lands on its word, a decision card that types and
+  seals, a receipt that snaps, a chat reveal at human rhythm; charts that accept only `claims.json` ids;
+  before/after split, wipe and picture-in-picture with both halves pixel-exact.
+- **Light, depth, a human hand, glass** — a lamp behind a card, a light sweep on the landing word, parallax
+  planes, a perspective dolly, hand-drawn circles / arrows / boxes projected through the camera, a spotlight
+  that glides, frosted panels (≤ 2, never on the caption lane).
+- **Reveals** — the first real screen arrives as a floating plate or compiles out of 6000 particles and hands
+  over to the footage lane on one frame; the last one lifts away for the close.
+- **Recording-native** — pointer and keys captured while you record (clap-aligned) or recovered from an old
+  tape as a proposal; a camera that pushes to where the work happens and lands on a spoken word; a redrawn
+  cursor with click rings; a keystroke pill; idle / spinner / typing / scroll detection that proposes the cuts.
+- **Privacy, measured** — the leak gate OCRs every extracted frame for e-mails, identifiers, URLs, tokens,
+  denylisted names and account badges and fails on anything unmasked; blur proposals with a measured radius.
+- **Captions, chapters, reflow** — karaoke and kinetic caption styles; one groups file feeds the burn-in,
+  `.srt`, `.vtt` and an `.ass` with per-word tags; chapters start on cuts; the screen in a frame; 9:16 / 1:1 /
+  4:5 crops that follow the cursor or the camera like an operator.
+- **Look before the build** — a logo becomes a contrast-checked skin and a style sheet; ten skins ship; a live
+  studio shows any frame in under a second and taps a still through the real renderer; one offline review
+  page carries honesty flags, comments and the storyboard sign-off.
+- **Sound without a sample pack** — thirteen synthesized sounds placed on seams and block landings, never
+  within 0.15 s of a word; bus chains with a built de-esser; a bed that breathes at seams.
+
+```
+/fde-demo-builder:new-film acme-monday
+cd acme-monday && npm i puppeteer gsap three d3-delaunay && pip install -r requirements.txt
+python make_sample_recording.py && python gen_vo_multivoice.py && python extract_clips.py
+node export_timeline.js scenes/timing_film_data.js scenes/shots.js && python build_film.py && python qa_film.py
+```
+
+## How it compares
+
+Against code-first video frameworks and screen-recorder tools, without naming any:
+
+| Capability | Code-first video frameworks | Screen-recorder tools | FDE Demo Builder v5 |
+|---|---|---|---|
+| Source of truth for timing | code / a composition timeline | the recording | the narration's word times — every cut, move, caption and sound is a spoken word |
+| Real product pixels | imported as media; freely graded | the recording, auto-zoomed | sacred: scaled, moved, soft-masked; never recoloured; a gate measures it |
+| Transitions over footage | any shader, any length | presets | seven cuts, declared in a ledger, ≤ 0.5 s over footage, never between two product screens |
+| Determinism | usually, if you avoid wall-clock code | real-time capture | render twice → byte-identical; software GL default; a canary gate proves it |
+| Cursor, zoom, keystrokes | none (you animate them) | automatic from the live pointer | from recorded telemetry (clap-aligned) or recovered from the tape; camera proposals you accept in the storyboard |
+| Dead air | manual trims | manual trims, some auto | measured change energy → proposed cuts, ramps, caret follow |
+| Privacy | none | blur tools | OCR + identifier patterns + fuzzy denylist + badge detector on every shipped frame; blur proposals |
+| Charts and numbers | any | none | only values traced in `claims.json`; derived figures refused |
+| Captions | plugins | auto subtitles | karaoke / kinetic styles, one groups file → burn-in + .srt/.vtt/.ass, chapters on cuts |
+| Look | code | themes | brand kit → contrast-checked skin + style sheet; ten skins; approved before the build |
+| Review | your own | share links | one offline HTML with honesty flags, comments and a storyboard sign-off; a live studio with real-renderer taps |
+| Sound | your assets | library SFX | synthesized on the machine, placed by rule, word-safe |
+| Runs | locally / cloud render | desktop app | locally, offline, no account; libraries from npm/pip under their own licences |
 
 ## v2 — Story rebuilds (b-roll + multi-voice)
 
@@ -92,16 +156,10 @@ recording's own pixels, driven on the narration's clock:
   (`wt(phase, word)`), verified by `check_cues.js`.
 - **Deterministic render** — frame-by-frame headless Chrome, multi-worker, no dropped frames.
 - **Broadcast-grade audio** — music bed ducked under the voices, two-pass *linear* loudnorm to −16 LUFS.
-- **14 QA gates** — cuts land, no blank plates, no freeze > 5 s, loudness, over-claims, identifier hygiene,
+- **QA gates** — cuts land, no blank plates, no freeze > 5 s, loudness, over-claims, identifier hygiene,
   every spoken figure traced to the screen (`claims.json`), captions, and the credit.
 - **Try it in one minute** — `make_sample_recording.py` generates a fictional "Acme Console" capture that
   the example config renders end to end.
-
-```
-/fde-demo-builder:new-film acme-monday
-cd acme-monday && python make_sample_recording.py && python gen_vo_multivoice.py && python extract_clips.py
-node export_timeline.js scenes/timing_film_data.js scenes/shots.js && python build_film.py && python qa_film.py
-```
 
 Method docs: [real-pixel-footage](skills/demo-video-builder/references/real-pixel-footage.md) ·
 [deterministic-render](skills/demo-video-builder/references/deterministic-render.md) ·
@@ -110,10 +168,10 @@ Method docs: [real-pixel-footage](skills/demo-video-builder/references/real-pixe
 [audio-mix](skills/demo-video-builder/references/audio-mix.md) ·
 [credit-footer](skills/demo-video-builder/references/credit-footer.md).
 
-## v4 — Production craft (HyperFrames-inspired)
+## v4 — Production craft
 
-Version 4 adds the craft that turns a clean demo into a film people remember, re-expressed from HeyGen's open-source
-HyperFrames for our real-pixel pipeline (see NOTICE.md). Everything still renders on your laptop.
+Version 4 adds the craft that turns a clean demo into a film people remember, built for our real-pixel pipeline.
+Everything still renders on your laptop; the third-party libraries it uses are listed in NOTICE.md.
 
 - **Seams, not cuts** — a `seams.json` ledger declares each cut; the outgoing screen is still moving when the next
   arrives, same axis, matched speed. The seam gate measures the rendered frames and fails any cut that stops early,
@@ -145,9 +203,10 @@ Method docs: [motion-doctrine](skills/demo-video-builder/references/motion-doctr
 [brief-storyboard-review](skills/demo-video-builder/references/brief-storyboard-review.md) ·
 [blocks-catalog](skills/demo-video-builder/references/blocks-catalog.md) ·
 [media-ledger-and-export](skills/demo-video-builder/references/media-ledger-and-export.md) ·
-[vfx-and-grading](skills/demo-video-builder/references/vfx-and-grading.md).
+[vfx-and-grading](skills/demo-video-builder/references/vfx-and-grading.md) ·
+[qa-gates](skills/demo-video-builder/references/qa-gates.md).
 
-## Quickstart
+## Quickstart (v1)
 
 ```
 /fde-demo-builder:new-demo acme-widgets
@@ -172,4 +231,7 @@ This plugin builds the **demo video** from a recording. The *live* demo backend 
 
 ## License
 
-Released under the MIT License. See [LICENSE](LICENSE).
+Released under the MIT License — see [LICENSE](LICENSE). Third-party libraries (gsap, three, d3-delaunay,
+puppeteer, numpy, scipy, Pillow, the optional OCR engines, edge-tts, ffmpeg) are installed from npm or pip
+under their own licences and are never vendored; GSAP is used under its standard no-charge licence. The full
+list is in [NOTICE.md](NOTICE.md).

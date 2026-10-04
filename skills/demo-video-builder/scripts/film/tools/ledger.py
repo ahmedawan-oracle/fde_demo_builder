@@ -24,7 +24,7 @@ Record (one JSON object per line; `path` is POSIX-relative to the project):
      "licence": {"name": "Pixabay Content License", "url": "https://…", "attribution": "", "commercial_ok": true},
      "description": "bed", "added_by": "ahmed", "date": "2026-10-01T12:00:00Z", "used_in": ["out/Acme_Film.mp4"]}
 
-Rules (measured from the HyperFrames media-use ledger, re-expressed for us):
+Rules:
   * append-only and keyed by path: the LAST record for a path is the file's record; history survives rejections;
   * ids are <kind>_NNN (zero-padded to 3); duration is stored rounded to 0.1 s (QA keeps using vo/<name>_phases.json);
   * writes are serialised by a lock file beside the ledger: 15 s stale-steal, 20 s acquire timeout;

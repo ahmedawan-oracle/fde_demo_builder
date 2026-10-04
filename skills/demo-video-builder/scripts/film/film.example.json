@@ -4,6 +4,8 @@
  "output": "out/Acme_Monday_Film.mp4",
  "fps": 30,
  "workers": 3,
+ "skin": "skins/harbor.json",
+ "skin_design": true,
  "bed": null,
  "bed_db": -12.0,
  "carve": true,
@@ -16,12 +18,18 @@
  "beats": null,
  "bed_offset": 0.0,
  "bed_end": "tail",
- "sfx": null,
+ "sfx": {
+  "auto": true
+ },
  "captions": {
   "config": "scenes/captions.json",
   "burn": true,
   "vtt": true,
+  "ass": true,
   "luma": "out/caption_luma.json"
+ },
+ "chapters": {
+  "merge": "auto"
  },
  "storyboard": "STORYBOARD.md",
  "ledger": "media.jsonl",

@@ -15,7 +15,7 @@ the output wrong?" moments are here.
   (this builder encodes everything as 1920x1080 / 30fps / yuv420p h264 + 48kHz stereo aac). Mismatches
   cause glitches or dropped audio at the joins.
 
-- **Concat list paths.** Use forward-slash absolute paths (`C:/Users/.../clip.mp4`). A Git-Bash `$(pwd)`
+- **Concat list paths.** Use forward-slash absolute paths (`C:/work/acme-demo/clip.mp4`). A Git-Bash `$(pwd)`
   style `/c/...` path can make ffmpeg silently read nothing and emit a stale/short file.
 
 - **A clip with no audio breaks concat.** If a segment (or a bookend) has no audio track, add silence

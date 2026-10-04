@@ -10,8 +10,8 @@ first ten-minute render does.
   --fast       the render subset only (ffmpeg, node + puppeteer, Chrome launch) — build_film.py runs this
   --offline    skip the edge-tts voice-list probe (it needs the network)
 
-Checks (thresholds are HyperFrames' doctor numbers unless noted):
-  python >= 3.10; pillow, numpy, edge_tts importable (faster_whisper optional)
+Checks (minimum versions are the ones the render path has been verified on):
+  python >= 3.10; pillow, numpy, scipy, edge_tts importable (faster_whisper and sklearn optional)
   ffmpeg / ffprobe found AND start (`-version` with a 5 s timeout — a binary that exists but cannot start is
     'cannot start'); major >= 6; libx264 + aac encoders; filters loudnorm, sidechaincompress, alimiter,
     acrossover, lut3d, psnr (FFMPEG_PATH / FFPROBE_PATH env overrides are honoured; a configured path that does
@@ -79,7 +79,9 @@ class Doctor(object):
     def python(self):
         v = sys.version_info
         self.add('python', v >= (3, 10), '%d.%d.%d' % v[:3], 'install Python 3.10 or newer')
-        for mod, pip, req in (('PIL', 'pillow', True), ('numpy', 'numpy', True), ('edge_tts', 'edge-tts', True), ('faster_whisper', 'faster-whisper', False)):
+        # scipy is a hard import of audio/sfx_synth.py, tools/cursor_track.py and tools/idle_detect.py (soft in fx_chain / leak_gate / brand_kit)
+        for mod, pip, req in (('PIL', 'pillow', True), ('numpy', 'numpy', True), ('scipy', 'scipy', True), ('edge_tts', 'edge-tts', True),
+                              ('faster_whisper', 'faster-whisper', False), ('sklearn', 'scikit-learn', False)):
             try:
                 m = __import__(mod)
                 self.add('pip ' + pip, True, getattr(m, '__version__', 'ok'))
@@ -125,6 +127,17 @@ class Doctor(object):
         if info.get('err'):
             self.add('puppeteer', False, info['err'][:120], 'npm i puppeteer in the project or a parent folder (or set NODE_PATH)'); return None
         self.add('puppeteer', True, 'resolved from ' + info['p'])
+        # the picture libraries a v5 scene loads from node_modules by relative path (lib/motion.js needs gsap;
+        # lib/title3d.js needs three + d3-delaunay). Missing ones are a warning: a film without those libs still builds.
+        probe = ("const r={};for(const m of ['gsap','three','d3-delaunay']){try{r[m]=require.resolve(m)}catch(e){r[m]=''}}console.log(JSON.stringify(r))")
+        code, out = _run(['node', '-e', probe], timeout=20, cwd=self.project)
+        try:
+            libs = json.loads(out.strip().splitlines()[-1])
+        except Exception:
+            libs = {}
+        missing = [m for m in ('gsap', 'three', 'd3-delaunay') if not libs.get(m)]
+        self.add('node libs', not missing, ('all of gsap, three, d3-delaunay resolve' if not missing else 'missing: ' + ', '.join(missing)),
+                 'npm i gsap three d3-delaunay in the project (scenes load them from node_modules — never a CDN)' if missing else '', level='warn' if missing else None)
         return info.get('ex') or ''
 
     def chrome(self, bundled):
@@ -140,15 +153,30 @@ class Doctor(object):
             self.add('chrome', False, 'no Chrome found', 'npx puppeteer browsers install chrome, or install Google Chrome, or set PUPPETEER_EXECUTABLE_PATH'); return
         # On Windows `chrome.exe --version` detaches and prints nothing, so the launch probe goes through puppeteer
         # exactly like render_frames.js does: launch headless, read browser.version(), close.
+        # The launch uses the render's own GL path (software rasteriser unless RENDER_GL=hardware) and reports the
+        # WebGL2 renderer string, so a film that uses lib/shaders.js or lib/title3d.js knows before the render
+        # whether its frames will match the canary and other machines.
+        gl_flags = "[]" if os.environ.get('RENDER_GL') == 'hardware' else "['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-gpu']"
         probe = ("const pp=require('puppeteer');(async()=>{const b=await pp.launch({headless:'new',executablePath:process.argv[1],"
-                 "args:['--no-sandbox','--disable-gpu']});const v=await b.version();await b.close();console.log(v)})()"
+                 "args:['--no-sandbox'].concat(" + gl_flags + ")});const v=await b.version();const p=await b.newPage();"
+                 "const gl=await p.evaluate(()=>{const g=document.createElement('canvas').getContext('webgl2');if(!g)return 'no webgl2';"
+                 "const d=g.getExtension('WEBGL_debug_renderer_info');return d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):'webgl2'}).catch(()=>'probe failed');"
+                 "await b.close();console.log(JSON.stringify({v,gl}))})()"
                  ".catch(e=>{console.error(String(e&&e.message||e).split('\\n')[0]);process.exit(4)})")
         code, out = _run(['node', '-e', probe, path], timeout=TOOL_TIMEOUT * 6, cwd=self.project)
         if code is None or code != 0:
             hint = 'set PUPPETEER_EXECUTABLE_PATH to the system Chrome (chrome-headless-shell crashed with STATUS_STACK_BUFFER_OVERRUN)' \
                 if any(w in str(out) for w in WINDOWS_CRASH) else 'the browser exists but cannot start headless; reinstall it or point PUPPETEER_EXECUTABLE_PATH elsewhere'
             self.add('chrome', False, '%s (%s) exit %s %s' % (path, source, code, str(out).strip()[:100]), hint); return
-        self.add('chrome', True, '%s launches (%s: %s)' % (out.strip().splitlines()[-1], source, path))
+        try:
+            info = json.loads(out.strip().splitlines()[-1])
+        except Exception:
+            info = {'v': out.strip().splitlines()[-1] if out.strip() else '?', 'gl': '?'}
+        self.add('chrome', True, '%s launches (%s: %s)' % (info.get('v', '?'), source, path))
+        gl = str(info.get('gl', '?'))
+        soft = 'swiftshader' in gl.lower()
+        self.add('webgl', gl != 'no webgl2', gl[:110] + (' [software — frames machine-independent]' if soft else ' [hardware GL — frames differ between machines; RENDER_GL=hardware]'),
+                 'WebGL2 unavailable: lib/shaders.js and lib/title3d.js scenes cannot render; check the Chrome build / flags' if gl == 'no webgl2' else '')
 
     # ---- edge-tts
     def edge_tts(self):

@@ -5,19 +5,36 @@
     python audio/beat_grid.py bed.mp3 --anchor 3.25 --film-len 93.3       # also prints the bed in-point
     python audio/beat_grid.py --selftest
 
-Recipe (numpy only; onset/grid steps follow HyperFrames' beatDetection.ts, Apache-2.0, HeyGen — see NOTICE.md):
-  decode mono 22.05 kHz → energy per 1024-sample window, hop 512 → an ONSET is a local maximum above 1.5 × the
-  mean of the ±20 neighbouring windows, ≥ 0.1 s after the previous onset → BPM₁ = 60 / median inter-onset
-  interval (needs ≥ 4 onsets).  A second, independent reading BPM₂ comes from the autocorrelation of the
-  onset-strength curve (60–200 BPM lag range; replaces the browser-only bpm-detective).  Both are folded to
-  60–120 for comparison: agree within 5 % → confidence 'high' (BPM₂ octave-aligned to the onset pulse),
-  within 10 % → 'low' (average), else 'uncertain' (raw onsets are the beats, no grid).  The grid is the BPM
-  laid from the phase (searched over the first ten onsets) that puts the most onsets within ±25 % of a beat;
-  intervals under 0.125 s bail to raw onsets.  Beats whose ±50 ms RMS is under 12 % of the loudest are dropped
-  (intro/outro) and each survivor carries strength = RMS / peak.
-  Downbeats: the bar phase (of 4) whose beats carry the most kick energy (< 150 Hz).  Phrases: every 4 bars.
-  Energy phases from 1 s RMS normalised to the loudest second: VOID < 0.2, LOW < 0.4, MEDIUM < 0.65, else HIGH;
-  key moments |Δ| > 0.12 between consecutive seconds; a hard stop is a drop < −0.25 inside the last 40 %.
+Recipe (numpy only, every step a pure function of the samples):
+  1. ONSETS. Decode mono 22.05 kHz → short-time spectrum (1024-sample Hann frames, hop 256 = 11.6 ms) →
+     log-compressed magnitudes log(1 + 20·|X|) → half-wave-rectified spectral flux: the sum over bins of the
+     POSITIVE change from one frame to the next (energy arriving, not leaving — a decaying note is not an onset).
+     The flux is compared with an adaptive threshold: 1.5 × its running median over ±0.35 s plus 0.03 of its
+     peak, and never under an absolute floor of 15 nats (a swell that lifts every bin 0.25 dB in one hop is a
+     21 dB/s rise — faster than any musical swell, slower than any hit; a sustained pad's beating partials
+     stay well under it). A frame above the threshold that is a local maximum of its two neighbours is an
+     onset, stamped at the frame CENTRE (a hit first shows in the frame it enters, half a frame early);
+     two onsets closer than 80 ms keep the stronger. Onset strength = flux / peak flux.
+  2. TEMPO. Every pair of onsets up to 2 s apart contributes its interval to a 10 ms histogram, weighted by the
+     product of the two strengths. Each histogram bin then FOLDS onto the candidate periods it could be a
+     multiple of: an interval d votes for d, d/2, d/3, d/4 and 2d, each vote scaled by 1/m, but only where the
+     candidate lands inside 60–180 BPM (0.333–1.0 s). The best bin of the folded curve, refined by a parabola
+     through its neighbours, is BPM₁. A second, independent reading BPM₂ comes from the autocorrelation of the
+     flux curve (60–200 BPM lag range). Both are folded to 60–120 for comparison: agree within 5 % →
+     confidence 'high' and the tempo is BPM₁'s precision in BPM₂'s octave (the histogram counts
+     subdivisions, the autocorrelation hears the pulse — hats on eighths must not double the grid), within
+     10 % → 'low' (average), else 'uncertain' (raw onsets are the beats, no grid).
+  3. GRID. Coarse phase: scan 64 phases across one period and keep the one where the strength-weighted,
+     Gaussian-windowed (σ = 0.1 period) onset mass is largest. Then three rounds of weighted least squares on
+     the inliers (|residual| < 0.2 period): each onset is assigned a beat index k and (phase, period) are the
+     line t ≈ phase + k·period that fits them best. The period may move at most 6 % from BPM₁ — a larger move
+     means the histogram was wrong, so only the phase is kept. Periods under 0.125 s bail to raw onsets.
+  4. SILENCE GATE. Beats whose ±50 ms RMS is under −45 dBFS (digital black, fade tails) are dropped; every
+     survivor carries strength = RMS / loudest beat, so a quiet beat is KEPT and marked, not lost.
+  5. STRUCTURE. Downbeats: the bar phase (of 4) whose beats carry the most kick energy (< 150 Hz). Phrases:
+     every 4 bars. Energy phases from 1 s RMS normalised to the loudest second: VOID < 0.2, LOW < 0.4,
+     MEDIUM < 0.65, else HIGH; key moments |Δ| > 0.12 between consecutive seconds; a hard stop is a drop
+     < −0.25 inside the last 40 %.
 
 Trust rule: BPM and beat precision are reliable only on rhythmic music. On a calm underscore the grid is a
 metronome the tracker imposed (often octave-doubled, more grid beats than real onsets): `rhythmic` is False,
@@ -25,7 +42,8 @@ snap() becomes a no-op, and you pace by phrases and energy instead. Never move a
 words win, the bed moves (the in-point).
 
 Outputs out/beats_<name>.json:
-  {bpm, confidence, offset, beats:[{t, strength}], downbeats:[t], phrases:[t], energy_phases:[{start, end,
+  {bpm, bpm_onsets, bpm_autocorr, confidence, offset, bar_phase, beats:[{t, strength}], downbeats:[t], phrases:[t],
+   onsets:[t], onset_strengths:[0..1], grid_fit:{period, phase, inliers, rms_resid_ms}, energy_phases:[{start, end,
    level, rms}], key_moments:[t], hard_stops:[t], rhythmic, duration}
 """
 from __future__ import annotations
@@ -41,14 +59,20 @@ from typing import Sequence
 import numpy as np
 
 SR = 22050
-WINDOW, HOP = 1024, 512
-LOCAL_WINDOWS, ONSET_FACTOR, MIN_ONSET_GAP_S = 20, 1.5, 0.1
-GRID_TOL, MIN_BEAT_S, PHASE_ANCHORS = 0.25, 0.125, 10
-SILENCE_FRAC, STRENGTH_WINDOW_S = 0.12, 0.05
+FRAME, HOP = 1024, 256                                         # 46 ms window, 11.6 ms hop
+FLUX_COMPRESSION = 20.0                                        # log(1 + γ·|X|): tames loud sustains, keeps soft hits
+THRESH_WINDOW_S, THRESH_FACTOR, THRESH_FLOOR = 0.35, 1.5, 0.03  # adaptive threshold: factor × running median + floor × peak
+ABS_FLUX_FLOOR = 15.0                                          # nats of log-magnitude gained across the spectrum in one hop
+MIN_ONSET_GAP_S = 0.08
+TEMPO_BPM_RANGE = (60.0, 180.0)                                # the folded tempo range
+IOI_MAX_S, IOI_BIN_S, FOLD_DIVISORS = 2.0, 0.010, (1, 2, 3, 4)
+GRID_PHASE_STEPS, GRID_SIGMA, GRID_INLIER, GRID_ROUNDS, GRID_MAX_PERIOD_MOVE = 64, 0.10, 0.20, 3, 0.06
+MIN_BEAT_S = 0.125
+SILENCE_DBFS, STRENGTH_WINDOW_S = -45.0, 0.05
 KICK_HZ, KICK_WINDOW_S, BEATS_PER_BAR, BARS_PER_PHRASE = 150.0, 0.1, 4, 4   # a kick lasts 100-200 ms
 ENERGY_LEVELS = ((0.2, 'VOID'), (0.4, 'LOW'), (0.65, 'MEDIUM'), (9.0, 'HIGH'))
 KEY_MOMENT_DELTA, HARD_STOP_DROP, HARD_STOP_TAIL = 0.12, -0.25, 0.4
-RHYTHMIC_MIN_ONSET_RATE, RHYTHMIC_MIN_COVERAGE = 1.0, 0.5     # onsets/s and share of grid beats backed by an onset
+RHYTHMIC_MIN_ONSET_RATE, RHYTHMIC_MIN_COVERAGE, RHYTHMIC_TOL = 1.0, 0.5, 0.25   # onsets/s, share of grid beats backed by an onset
 SNAP_TOL_S = 0.25
 
 
@@ -61,60 +85,136 @@ def decode(path: str, sr: int = SR) -> np.ndarray:
     return np.frombuffer(r.stdout, dtype=np.float32).copy()
 
 
-def energy_curve(x: np.ndarray, window: int = WINDOW, hop: int = HOP) -> np.ndarray:
-    """Mean-square energy per window."""
-    if x.size < window:
+def spectral_flux(x: np.ndarray, frame: int = FRAME, hop: int = HOP, compression: float = FLUX_COMPRESSION) -> np.ndarray:
+    """Half-wave-rectified spectral flux per hop in nats (sum over bins of the positive change of log(1 + γ|X|)).
+    Index n is the change INTO frame n; flux[0] is 0. Empty for signals shorter than one frame."""
+    if x.size < frame:
         return np.zeros(0)
-    v = np.lib.stride_tricks.sliding_window_view(x, window)[::hop]
-    return (v.astype(np.float64) ** 2).mean(axis=1)
+    win = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(frame) / (frame - 1))).astype(np.float32)
+    view = np.lib.stride_tricks.sliding_window_view(x, frame)[::hop]
+    n = view.shape[0]
+    flux = np.zeros(n)
+    prev = None
+    for k in range(0, n, 1024):                                  # chunked: a 4-minute bed is ~20k frames
+        mag = np.abs(np.fft.rfft(view[k:k + 1024] * win, axis=1))
+        comp = np.log1p(compression * mag)
+        if prev is not None:
+            comp = np.vstack([prev, comp])
+            flux[k:k + comp.shape[0] - 1] = np.maximum(0.0, np.diff(comp, axis=0)).sum(axis=1)
+        else:
+            flux[1:comp.shape[0]] = np.maximum(0.0, np.diff(comp, axis=0)).sum(axis=1)
+        prev = comp[-1:]
+    return flux
 
 
-def detect_onsets(energies: np.ndarray, sr: int = SR, hop: int = HOP) -> list[float]:
-    """Local maxima above 1.5 × the mean of the surrounding ±20 windows, at least 0.1 s apart."""
-    e, L = energies, LOCAL_WINDOWS
-    if e.size <= 2 * L + 1:
-        return []
-    c = np.concatenate([[0.0], np.cumsum(e)])
-    local_mean = (c[2 * L:] - c[:-2 * L]) / (2 * L)                 # mean of e[i-L : i+L] for i in L..n-L
-    idx = np.arange(L, e.size - L)
-    local_mean = local_mean[:idx.size]
-    cur = e[idx]
-    peak = (cur > ONSET_FACTOR * local_mean) & (cur > e[idx - 1]) & (cur > e[idx + 1])
-    out: list[float] = []
-    for i in idx[peak]:
-        t = i * hop / sr
-        if not out or t - out[-1] > MIN_ONSET_GAP_S:
-            out.append(round(t, 3))
-    return out
+def running_median(v: np.ndarray, half: int) -> np.ndarray:
+    """Median of v over ±half samples, edges padded by repetition."""
+    if half <= 0 or v.size == 0:
+        return v.copy()
+    padded = np.pad(v, (half, half), mode='edge')
+    return np.median(np.lib.stride_tricks.sliding_window_view(padded, 2 * half + 1), axis=1)
 
 
-def bpm_from_onsets(onsets: Sequence[float]) -> float | None:
+def pick_onsets(flux: np.ndarray, sr: int = SR, hop: int = HOP, frame: int = FRAME) -> tuple[list[float], list[float]]:
+    """Onset times (frame centres) and strengths (flux / peak flux) from the flux curve: above the adaptive
+    threshold and the absolute floor, a local maximum, and at least MIN_ONSET_GAP_S from its neighbour (the
+    stronger of a close pair survives)."""
+    if flux.size < 3 or flux.max() <= 0:
+        return [], []
+    hop_s = hop / sr
+    peak = float(flux.max())
+    thr = np.maximum(THRESH_FACTOR * running_median(flux, int(round(THRESH_WINDOW_S / hop_s))) + THRESH_FLOOR * peak, ABS_FLUX_FLOOR)
+    mid = flux[1:-1]
+    is_peak = (mid > thr[1:-1]) & (mid >= flux[:-2]) & (mid > flux[2:])
+    times: list[float] = []
+    strengths: list[float] = []
+    centre_s = frame / (2 * sr)
+    for i in np.flatnonzero(is_peak) + 1:
+        t, s = i * hop_s + centre_s, float(flux[i]) / peak
+        if times and t - times[-1] < MIN_ONSET_GAP_S:
+            if s > strengths[-1]:
+                times[-1], strengths[-1] = t, s
+            continue
+        times.append(t)
+        strengths.append(s)
+    return [round(t, 4) for t in times], [round(s, 4) for s in strengths]
+
+
+# ----------------------------------------------------------------------------------------------- tempo
+def interval_histogram(onsets: Sequence[float], strengths: Sequence[float] | None = None,
+                       max_s: float = IOI_MAX_S, bin_s: float = IOI_BIN_S) -> np.ndarray:
+    """Strength-weighted histogram of every inter-onset interval up to `max_s` (all pairs, not just neighbours),
+    smoothed with a 3-bin triangle. Bin i covers [i·bin_s, (i+1)·bin_s)."""
+    on = np.asarray(onsets, dtype=np.float64)
+    w = np.ones(on.size) if strengths is None else np.asarray(strengths, dtype=np.float64)
+    nb = int(round(max_s / bin_s)) + 1
+    h = np.zeros(nb)
+    for i in range(on.size):
+        d = on[i + 1:] - on[i]
+        m = d <= max_s
+        if not m.any():
+            continue
+        np.add.at(h, np.minimum(nb - 1, (d[m] / bin_s).astype(int)), w[i] * w[i + 1:][m])
+    if nb >= 3:
+        h = np.convolve(h, [0.25, 0.5, 0.25], mode='same')
+    return h
+
+
+def fold_tempo(hist: np.ndarray, bin_s: float = IOI_BIN_S, bpm_range: Sequence[float] = TEMPO_BPM_RANGE,
+               divisors: Sequence[int] = FOLD_DIVISORS) -> tuple[np.ndarray, np.ndarray]:
+    """Fold the interval histogram onto candidate periods inside `bpm_range`: an interval d votes for d/m (m in
+    divisors, weight 1/m) and for 2d (weight 1/2). Returns (periods_s, votes) on the histogram's own bin grid."""
+    p_lo, p_hi = 60.0 / bpm_range[1], 60.0 / bpm_range[0]
+    periods = (np.arange(hist.size) + 0.5) * bin_s
+    votes = np.zeros(hist.size)
+    for m in divisors:
+        cand = periods / m
+        ok = (cand >= p_lo) & (cand <= p_hi)
+        np.add.at(votes, np.minimum(hist.size - 1, (cand[ok] / bin_s).astype(int)), hist[ok] / m)
+    cand = periods * 2
+    ok = (cand >= p_lo) & (cand <= p_hi)
+    np.add.at(votes, np.minimum(hist.size - 1, (cand[ok] / bin_s).astype(int)), hist[ok] * 0.5)
+    outside = (periods < p_lo) | (periods > p_hi)
+    votes[outside] = 0.0
+    return periods, votes
+
+
+def tempo_from_intervals(onsets: Sequence[float], strengths: Sequence[float] | None = None) -> float | None:
+    """BPM₁: the peak of the folded interval histogram, refined by a parabola through its neighbours. None with
+    fewer than four onsets (three intervals cannot vote for a tempo)."""
     if len(onsets) < 4:
         return None
-    ioi = np.diff(np.asarray(onsets))
-    med = float(np.median(ioi))
-    return round(60.0 / med, 1) if med > 0 else None
-
-
-def bpm_autocorr(energies: np.ndarray, sr: int = SR, hop: int = HOP, lo_bpm: float = 60, hi_bpm: float = 200) -> float | None:
-    """Second detector: autocorrelation of the onset-strength curve (half-wave rectified log-energy difference)."""
-    if energies.size < 8:
+    periods, votes = fold_tempo(interval_histogram(onsets, strengths))
+    if votes.max() <= 0:
         return None
-    le = np.log(energies + 1e-10)
-    osf = np.maximum(0.0, np.diff(le))
-    osf -= osf.mean()
-    n = 1 << int(math.ceil(math.log2(2 * osf.size)))
-    f = np.fft.rfft(osf, n)
-    ac = np.fft.irfft(f * np.conj(f), n)[:osf.size]
-    sec_per_hop = hop / sr
-    lo, hi = int(60.0 / hi_bpm / sec_per_hop), int(60.0 / lo_bpm / sec_per_hop)
+    i = int(np.argmax(votes))
+    p = periods[i]
+    if 0 < i < votes.size - 1:
+        a, b, c = votes[i - 1], votes[i], votes[i + 1]
+        den = a - 2 * b + c
+        if den < 0:
+            p += IOI_BIN_S * 0.5 * (a - c) / den
+    return round(60.0 / p, 1)
+
+
+def tempo_from_autocorrelation(flux: np.ndarray, sr: int = SR, hop: int = HOP, lo_bpm: float = 60, hi_bpm: float = 200) -> float | None:
+    """BPM₂: the lag (60–200 BPM) where the mean-removed flux curve correlates best with itself."""
+    if flux.size < 8:
+        return None
+    f0 = flux - flux.mean()
+    n = 1 << int(math.ceil(math.log2(2 * f0.size)))
+    spec = np.fft.rfft(f0, n)
+    ac = np.fft.irfft(spec * np.conj(spec), n)[:f0.size]
+    hop_s = hop / sr
+    lo, hi = int(60.0 / hi_bpm / hop_s), int(60.0 / lo_bpm / hop_s)
     if hi <= lo + 1 or hi >= ac.size:
         return None
     lag = lo + int(np.argmax(ac[lo:hi]))
-    return round(60.0 / (lag * sec_per_hop), 1)
+    return round(60.0 / (lag * hop_s), 1)
 
 
 def canonical(bpm: float) -> float:
+    """Fold any tempo into 60–120 so two readings an octave apart compare as equals."""
     while bpm > 120:
         bpm /= 2
     while bpm < 60:
@@ -126,33 +226,55 @@ def octave_align(bpm: float, reference: float) -> float:
     return min((bpm / 2, bpm, bpm * 2), key=lambda c: abs(c - reference))
 
 
-def regularize(onsets: Sequence[float], bpm: float, duration: float) -> tuple[list[float], float]:
-    """Lay the BPM grid from the phase (among the first ten onsets) that captures the most onsets within ±25 %,
-    then refine interval + phase by a least-squares fit of the captured onsets (our addition: the median IOI is
-    quantised to the 23 ms hop, which drifted 0.18 s over 30 s at 100 BPM). Returns (beats, refined_bpm)."""
-    if not onsets or bpm <= 0 or duration <= 0:
-        return list(onsets), bpm
-    iv = 60.0 / bpm
-    if iv < MIN_BEAT_S:
-        return list(onsets), bpm
+# ----------------------------------------------------------------------------------------------- grid
+def fit_grid(onsets: Sequence[float], strengths: Sequence[float] | None, bpm: float, duration: float) -> tuple[list[float], float, dict]:
+    """Lay a beat grid through the onsets: coarse phase scan, then weighted least squares on the inliers for
+    (phase, period). Returns (beats, refined_bpm, fit) where fit = {period, phase, inliers, rms_resid_ms} and the
+    residual is strength-weighted (a weak secondary peak 80 ms after a kick barely counts).
+    Falls back to the raw onsets when the period is under MIN_BEAT_S or nothing can be fitted."""
     on = np.asarray(onsets, dtype=np.float64)
-    ph = np.mod(on, iv)
-    best_off, best = 0.0, -1
-    for a in onsets[:PHASE_ANCHORS]:
-        off = a % iv
-        d = np.abs(ph - off)
-        score = int(((np.minimum(d, iv - d)) < iv * GRID_TOL).sum())
-        if score > best:
-            best, best_off = score, off
-    k = np.round((on - best_off) / iv)
-    resid = on - (best_off + k * iv)
-    hit = np.abs(resid) < iv * GRID_TOL
-    if hit.sum() >= 4 and np.ptp(k[hit]) > 0:
-        slope, icpt = np.polyfit(k[hit], on[hit], 1)
-        if abs(slope - iv) / iv < 0.05:                    # accept only a small correction of the tempo
-            iv, best_off = float(slope), float(icpt % slope)
-    beats = [round(float(t), 3) for t in np.arange(best_off, duration + 1e-3, iv)]
-    return beats, round(60.0 / iv, 2)
+    w = np.ones(on.size) if strengths is None else np.asarray(strengths, dtype=np.float64)
+    empty = {'period': None, 'phase': None, 'inliers': 0, 'rms_resid_ms': None}
+    if on.size == 0 or bpm <= 0 or duration <= 0:
+        return list(onsets), bpm, empty
+    p0 = 60.0 / bpm
+    if p0 < MIN_BEAT_S:
+        return list(onsets), bpm, empty
+    # coarse phase: strength-weighted Gaussian onset mass around each candidate phase
+    cands = np.arange(GRID_PHASE_STEPS) * p0 / GRID_PHASE_STEPS
+    r = on[None, :] - cands[:, None]
+    r -= np.round(r / p0) * p0                                     # wrapped residual in (-p0/2, p0/2]
+    mass = (w[None, :] * np.exp(-0.5 * (r / (GRID_SIGMA * p0)) ** 2)).sum(axis=1)
+    phase, period = float(cands[int(np.argmax(mass))]), p0
+    inl = np.zeros(on.size, dtype=bool)
+    for _ in range(GRID_ROUNDS):
+        k = np.round((on - phase) / period)
+        resid = on - (phase + k * period)
+        inl = np.abs(resid) < GRID_INLIER * period
+        if inl.sum() < 2 or np.ptp(k[inl]) == 0:
+            break
+        ww = w[inl]
+        kk, tt = k[inl], on[inl]
+        sw, sk, skk, st, skt = ww.sum(), (ww * kk).sum(), (ww * kk * kk).sum(), (ww * tt).sum(), (ww * kk * tt).sum()
+        det = sw * skk - sk * sk
+        if det <= 0:
+            break
+        new_period = (sw * skt - sk * st) / det
+        new_phase = (skk * st - sk * skt) / det
+        if abs(new_period - p0) / p0 <= GRID_MAX_PERIOD_MOVE:
+            period = float(new_period)
+            phase = float(new_phase)
+        else:                                                      # tempo vote stands; only the phase moves
+            phase = float((ww * (on[inl] - kk * period)).sum() / sw)
+    phase = phase % period
+    k = np.round((on - phase) / period)
+    resid = on - (phase + k * period)
+    inl = np.abs(resid) < GRID_INLIER * period
+    rms_ms = float(np.sqrt((w[inl] * resid[inl] ** 2).sum() / w[inl].sum()) * 1000) if inl.any() and w[inl].sum() > 0 else None
+    beats = [round(float(t), 3) for t in np.arange(phase, duration + 1e-3, period)]
+    fit = {'period': round(period, 5), 'phase': round(phase, 4), 'inliers': int(inl.sum()),
+           'rms_resid_ms': round(rms_ms, 1) if rms_ms is not None else None}     # strength-weighted residual
+    return beats, round(60.0 / period, 2), fit
 
 
 def rms_at(x: np.ndarray, sr: int, t: float, half_s: float = STRENGTH_WINDOW_S) -> float:
@@ -162,13 +284,13 @@ def rms_at(x: np.ndarray, sr: int, t: float, half_s: float = STRENGTH_WINDOW_S) 
     return float(np.sqrt((seg.astype(np.float64) ** 2).mean())) if seg.size else 0.0
 
 
-def gate_by_silence(beats: Sequence[float], x: np.ndarray, sr: int = SR) -> tuple[list[float], list[float], float]:
-    """Drop beats in near-silence (±50 ms RMS under 12 % of the loudest beat); strength = RMS / peak."""
+def gate_quiet_beats(beats: Sequence[float], x: np.ndarray, sr: int = SR, floor_dbfs: float = SILENCE_DBFS) -> tuple[list[float], list[float], float]:
+    """Drop beats whose ±50 ms RMS is under `floor_dbfs` (silence, not music); strength = RMS / loudest beat."""
     if not beats:
         return [], [], 1e-6
     e = np.array([rms_at(x, sr, t) for t in beats])
     peak = max(float(e.max()), 1e-6)
-    keep = e >= peak * SILENCE_FRAC
+    keep = 20 * np.log10(np.maximum(e, 1e-12)) >= floor_dbfs
     return [float(b) for b, k in zip(beats, keep) if k], [round(float(min(1.0, v / peak)), 3) for v, k in zip(e, keep) if k], float(peak)
 
 
@@ -222,7 +344,7 @@ def is_rhythmic(onsets: Sequence[float], grid: Sequence[float], bpm: float | Non
     if len(onsets) / duration < RHYTHMIC_MIN_ONSET_RATE:
         return False
     on = np.asarray(onsets)
-    tol = 60.0 / bpm * GRID_TOL
+    tol = 60.0 / bpm * RHYTHMIC_TOL
     covered = sum(1 for b in grid if np.abs(on - b).min() <= tol)
     return covered / len(grid) >= RHYTHMIC_MIN_COVERAGE
 
@@ -232,14 +354,14 @@ def analyse(path: str) -> dict:
     """Full analysis of a bed file → the beats.json dict (see module docstring)."""
     x = decode(path)
     duration = x.size / SR
-    e = energy_curve(x)
-    onsets = detect_onsets(e)
-    b1, b2 = bpm_from_onsets(onsets), bpm_autocorr(e)
+    flux = spectral_flux(x)
+    onsets, strengths = pick_onsets(flux)
+    b1, b2 = tempo_from_intervals(onsets, strengths), tempo_from_autocorrelation(flux)
     bpm, conf, grid_bpm = None, 'uncertain', None
     if b1 and b2:
         pct = abs(canonical(b1) - canonical(b2)) / canonical(b2)
         if pct < 0.05:
-            bpm, conf = octave_align(b2, b1), 'high'
+            bpm, conf = octave_align(b1, b2), 'high'          # histogram precision, autocorrelation octave
         elif pct < 0.10:
             bpm, conf = round((b1 + b2) / 2), 'low'
         else:
@@ -249,21 +371,23 @@ def analyse(path: str) -> dict:
         bpm, conf, grid_bpm = b1, 'low', b1
     elif b2:                                             # autocorrelation alone, under 4 onsets: a hint, never a grid
         bpm, conf, grid_bpm = b2, 'uncertain', None
+    fit = {'period': None, 'phase': None, 'inliers': 0, 'rms_resid_ms': None}
     if grid_bpm:
-        grid, bpm = regularize(onsets, grid_bpm, duration)
+        grid, bpm, fit = fit_grid(onsets, strengths, grid_bpm, duration)
     else:
         grid = list(onsets)
     phase = downbeat_phase(grid, x)                      # on the FULL grid, before quiet beats are dropped
     downbeat_set = set(grid[phase::BEATS_PER_BAR])
-    times, strengths, peak = gate_by_silence(grid, x)
+    times, beat_strengths, peak = gate_quiet_beats(grid, x)
     downbeats = [t for t in times if t in downbeat_set]
     phrases = downbeats[::BARS_PER_PHRASE]
     ep, key, stops = energy_phases(x)
     return {
         'source': os.path.basename(path), 'duration': round(duration, 3), 'bpm': round(bpm, 1) if bpm else None,
         'bpm_onsets': b1, 'bpm_autocorr': b2, 'confidence': conf, 'offset': times[0] if times else None, 'bar_phase': phase,
-        'beats': [{'t': t, 'strength': s} for t, s in zip(times, strengths)], 'downbeats': downbeats, 'phrases': phrases,
-        'onsets': onsets, 'energy_phases': ep, 'key_moments': key, 'hard_stops': stops,
+        'beats': [{'t': t, 'strength': s} for t, s in zip(times, beat_strengths)], 'downbeats': downbeats, 'phrases': phrases,
+        'onsets': onsets, 'onset_strengths': strengths, 'grid_fit': fit,
+        'energy_phases': ep, 'key_moments': key, 'hard_stops': stops,
         'rhythmic': is_rhythmic(onsets, times, bpm, duration, conf),
     }
 
@@ -337,7 +461,7 @@ def bed_end(grid: dict, last_word_t: float, bed_offset: float = 0.0, min_gap: fl
 
 
 # ----------------------------------------------------------------------------------------------- bed edges
-LOOP_XFADE_S = 0.6     # loop seam crossfade (HyperFrames joins generated beds with 0.3 s; 0.6 is kinder to a sustained pad)
+LOOP_XFADE_S = 0.6     # loop seam crossfade; 0.6 s is kind to a sustained pad, a shorter seam clicks on reverb tails
 
 
 def loop_plan(bed_dur: float, need_dur: float, xfade: float = LOOP_XFADE_S) -> tuple[int, str]:
@@ -370,8 +494,9 @@ def clamp_fades(fade_in: float, fade_out: float, span: float) -> tuple[float, fl
 
 
 # ----------------------------------------------------------------------------------------------- selftest
-def _synth_drums(bpm: float = 100.0, dur: float = 30.0, sr: int = SR, phase_s: float = 0.3) -> np.ndarray:
-    """Kick on beat 1 of every bar, snare on 2 and 4, hats on 8ths, with a 4-bar swell; starts at phase_s."""
+def _synth_drums(bpm: float = 100.0, dur: float = 30.0, sr: int = SR, phase_s: float = 0.3, lead_silence_s: float = 0.0) -> np.ndarray:
+    """Kick on beat 1 of every bar, snare on 2 and 4, hats on 8ths, with a 4-bar swell; starts at phase_s.
+    `lead_silence_s` of digital black is prepended (for the silence gate)."""
     rng = np.random.default_rng(7)
     n = int(dur * sr)
     x = np.zeros(n)
@@ -397,7 +522,10 @@ def _synth_drums(bpm: float = 100.0, dur: float = 30.0, sr: int = SR, phase_s: f
             x[h:h + hat.size] += hat * 0.6
         k += 1
     swell = 0.6 + 0.4 * (np.arange(n) / n)
-    return (x * swell / np.abs(x).max() * 0.8).astype(np.float32)
+    out = (x * swell / np.abs(x).max() * 0.8).astype(np.float32)
+    if lead_silence_s > 0:
+        out = np.concatenate([np.zeros(int(lead_silence_s * sr), dtype=np.float32), out])
+    return out
 
 
 def _synth_pad(dur: float = 30.0, sr: int = SR) -> np.ndarray:
@@ -422,9 +550,12 @@ def _selftest() -> int:
     ok = True
     drums = _write_wav(os.path.join(tmp, 'drums.wav'), _synth_drums())
     g = analyse(drums)
-    print('drums: bpm %s (onsets %s, autocorr %s) conf %s  beats %d  downbeats %d  phrases %d  rhythmic %s  offset %s'
-          % (g['bpm'], g['bpm_onsets'], g['bpm_autocorr'], g['confidence'], len(g['beats']), len(g['downbeats']), len(g['phrases']), g['rhythmic'], g['offset']))
-    ok &= g['bpm'] is not None and abs(g['bpm'] - 100) <= 2 and g['confidence'] == 'high' and g['rhythmic']
+    print('drums: bpm %s (intervals %s, autocorr %s) conf %s  onsets %d  beats %d  downbeats %d  phrases %d  rhythmic %s  offset %s'
+          % (g['bpm'], g['bpm_onsets'], g['bpm_autocorr'], g['confidence'], len(g['onsets']), len(g['beats']), len(g['downbeats']), len(g['phrases']), g['rhythmic'], g['offset']))
+    print('       grid fit %s' % g['grid_fit'])
+    ok &= g['bpm'] is not None and abs(g['bpm'] - 100) <= 1.0 and g['confidence'] == 'high' and g['rhythmic']
+    ok &= g['grid_fit']['rms_resid_ms'] is not None and g['grid_fit']['rms_resid_ms'] < 25
+    ok &= 90 <= len(g['onsets']) <= 140                   # 100 eighth-notes in 30 s at 100 BPM, plus a few kick tails
     # downbeats land on the kicks at 0.3 + 2.4·k
     db_err = max(min(abs(d - (0.3 + 2.4 * k)) for k in range(14)) for d in g['downbeats'])
     ok &= db_err <= 0.03
@@ -440,11 +571,25 @@ def _selftest() -> int:
     be = bed_end(g, last_word_t=15.0, bed_offset=ip['offset'])
     ok &= be['fade_end'] >= 15.6 and be['reason'].startswith('phrase')
     print('       bed end %s' % be)
+    # determinism: the same file analysed twice is byte-identical
+    ok &= json.dumps(analyse(drums), sort_keys=True) == json.dumps(g, sort_keys=True)
+    # silence gate: 3 s of digital black before the drums must carry no beats, and the grid must still be right
+    quiet = _write_wav(os.path.join(tmp, 'drums_lead.wav'), _synth_drums(lead_silence_s=3.0))
+    q = analyse(quiet)
+    first_beat = q['beats'][0]['t'] if q['beats'] else None
+    ok &= first_beat is not None and first_beat >= 3.2 and abs(q['bpm'] - 100) <= 1.0 and q['rhythmic']
+    print('gated: first beat %.3f s (drums start at 3.3), bpm %s, beats %d' % (first_beat, q['bpm'], len(q['beats'])))
+    # a slow tempo with hats on eighths reads as 72, not 144: the pulse, not the subdivision
+    slow = _write_wav(os.path.join(tmp, 'slow.wav'), _synth_drums(bpm=72.0))
+    s = analyse(slow)
+    s_err = max(min(abs(d - (0.3 + 60.0 / 72 * 4 * k)) for k in range(10)) for d in s['downbeats'])
+    ok &= s['bpm'] is not None and abs(s['bpm'] - 72) <= 1.0 and s['rhythmic'] and s_err <= 0.03
+    print('slow:  bpm %s (intervals %s, autocorr %s) conf %s  downbeat max error %.3f s' % (s['bpm'], s['bpm_onsets'], s['bpm_autocorr'], s['confidence'], s_err))
     pad = _write_wav(os.path.join(tmp, 'pad.wav'), _synth_pad())
     p = analyse(pad)
     print('pad:   bpm %s conf %s  onsets %d  beats %d  rhythmic %s  energy phases %s'
           % (p['bpm'], p['confidence'], len(p['onsets']), len(p['beats']), p['rhythmic'], [(e['level'], e['start'], e['end']) for e in p['energy_phases']][:6]))
-    ok &= not p['rhythmic'] and snap(7.77, p) == 7.77
+    ok &= not p['rhythmic'] and snap(7.77, p) == 7.77 and len(p['onsets']) <= 6       # a swell is not a hit
     ok &= any(e['level'] == 'HIGH' for e in p['energy_phases']) and any(e['level'] in ('VOID', 'LOW') for e in p['energy_phases'])
     # bed edges: a 30 s bed looped to cover 50 s with 0.6 s crossfades = 2 copies, 59.4 s; fades clamp proportionally
     copies, graph = loop_plan(30.0, 50.0)

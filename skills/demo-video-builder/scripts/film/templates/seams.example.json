@@ -1,16 +1,17 @@
 {
  "_doc": [
-  "seams.json \u2014 the vector ledger: one row per CUT of the film (seam:true hand-offs are not cuts and stay out).",
+  "seams.json — the vector ledger: one row per CUT of the film (seam:true hand-offs are not cuts and stay out).",
   "Write it BEFORE the shots. cut = seconds, or a cue expression: P.<phase>, P.<phase>_end, wt(<phase>,<word>[,n]), arithmetic.",
   "axis x|y|z; dir: x -1 = leftward (the current), y -1 = upward (elevation), z +1 = push / growing, z -1 = pull / arrival.",
   "exit and entry must share axis AND dir; consecutive rows never reverse without cause: click | chapter | impact.",
   "technique: cut-the-curve (default) | zoom-through (z+1) | inverse zoom-through (z-1) | combined (x + both shrink) | rack-focus | waterfall.",
-  "Reserved vectors (y-1, z+1, z-1): spend at most one per act. A film repeats 2\u20133 techniques.",
-  "selectors: the layer the scene lets SEAM drive (SEAM.apply) \u2014 or #camera, which the scene composes itself via SEAM.offset().",
-  "opts: per-row overrides of the technique defaults (travel, exitDur, entryDur, blur, peak, dx \u2026).",
+  "Reserved vectors (y-1, z+1, z-1): spend at most one per act. A film repeats 2–3 techniques.",
+  "selectors: the layer the scene lets SEAM drive (SEAM.apply) — or #camera, which the scene composes itself via SEAM.offset().",
+  "opts: per-row overrides of the technique defaults (travel, exitDur, entryDur, blur, peak, dx …).",
   "export_timeline.js writes the resolved rows into out/timeline.json; gates/seam_gate.py measures them on the rendered film.",
-  "Fictional Acme sample: title card \u2192 notebook \u2192 question \u2192 close.",
-  "A footage-to-footage seam lives on ONE wrapper: name the exit row \"#camera\" and the entry row \"#camera-in\"; the scene asks SEAM.offset for both and draws the visible side."
+  "Fictional Acme sample: recreated chat -> title card -> (match-cut) hero dive onto the staged notebook -> question -> (gl lightLeak) close.",
+  "A footage-to-footage seam lives on ONE wrapper: name the exit row \"#camera\" and the entry row \"#camera-in\"; the scene asks SEAM.offset for both and draws the visible side.",
+  "Shader seams: {\"type\": \"gl\", \"technique\": \"chromaSplit|warpDissolve|lightLeak|flashWhite|iris|slitScan|crossWarp\", \"cut\": ..., \"dur\": 0.3, \"split\": 0.5, \"cause\": ...}. No exit/entry vectors: the two sides are textures and the window (dur, split before/after the cut) IS the transition. The scene feeds SEAM.glSeams() to GL.cutTransition (lib/shaders.js); dur stays within 0.1-0.5 s, whip/zoom kinds need a cause, flashWhite/lightLeak are exempt from the luma-spike check because they brighten by design. Never between two product screens."
  ],
  "current": "x-1",
  "fps": 30,
@@ -20,20 +21,32 @@
  ],
  "seams": [
   {
-   "id": "title->notebook",
-   "cut": "P.nb",
+   "id": "hook->title",
+   "cut": "P.title",
    "technique": "cut-the-curve",
-   "act": "demo",
+   "act": "open",
    "exit": {
-    "selector": "#titleCard",
+    "selector": "#hookCard",
     "axis": "x",
     "dir": -1
    },
    "entry": {
-    "selector": "#camera",
+    "selector": "#titleCard",
     "axis": "x",
     "dir": -1
    }
+  },
+  {
+   "id": "title->notebook",
+   "type": "match-cut",
+   "cut": "wt('nb','notebook') - 0.9",
+   "act": "demo",
+   "cause": "chapter",
+   "carrier": {
+    "out": "#titleCard",
+    "in": "#reveals"
+   },
+   "_note": "the title card cuts out on the frame the hero plate appears; lib/reveals.js REVEAL.heroDive flies the first still onto the staged notebook window and the lane takes over on dive.end (FILM.dive)"
   },
   {
    "id": "notebook->question",
@@ -53,19 +66,19 @@
   },
   {
    "id": "answer->close",
+   "type": "gl",
+   "technique": "lightLeak",
    "cut": "P.close",
-   "technique": "cut-the-curve",
+   "dur": 0.4,
+   "split": 0.15,
    "act": "close",
-   "exit": {
-    "selector": "#camera",
-    "axis": "x",
-    "dir": -1
+   "opts": {
+    "intensity": 0.45,
+    "width": 0.06,
+    "color": "#E56B5E",
+    "color2": "#204A56"
    },
-   "entry": {
-    "selector": "#closeCard",
-    "axis": "x",
-    "dir": -1
-   }
+   "_note": "the one shader accent: <= 2 frames over the footage side (split 0.15 x 0.4 s = 0.06 s before the cut, envelope still dim), accent + ground only, never gold; the leak never grades the answer still. The scene feeds SEAM.glSeams() to GL.cutTransition with lane.imageFor('answer') on the footage side."
   }
  ]
 }

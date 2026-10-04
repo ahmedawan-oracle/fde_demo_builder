@@ -1,0 +1,33 @@
+{
+ "_doc": [
+  "captions.json for the booth-trailer template -> copy to scenes/captions.json (new-film does this).",
+  "Lane style keynote (the skin's captions.style: skins/ember.json); the hero question in karaoke (the spoken word lights up,",
+  "accent + bold cross-fade without reflow, 1.06 pulse); the closing line kinetic (word waterfall 0.06 s x 0.84^i <= 0.3 s, block",
+  "exit); title and close cards drop (their words are already on screen - captioning them twice is text-on-text).",
+  "karaoke on <= 2 phases per film; kinetic on recreated lines only. Everything here is fictional (Acme).",
+  "Keep this file (and captions_overrides.json if you add one) in qa.json 'authored' so display substitutions pass the text gates."
+ ],
+ "template": "booth-trailer",
+ "style": "keynote",
+ "mode": "rail",
+ "burn": true,
+ "stage": [1280, 720],
+ "creditKeepOut": 4.0,
+ "phases": {
+  "hook": "drop",
+  "title": "drop",
+  "demo": {"fate": "rail", "style": "karaoke"},
+  "answer": {"fate": "rail", "style": "keynote"},
+  "proof": "drop",
+  "close": {"fate": "rail", "style": "kinetic"}
+ },
+ "overrides": [],
+ "grouping": {
+  "gap": 0.35,
+  "maxDur": 2.2,
+  "tail": 0.5,
+  "maxWords": 5,
+  "maxChars": 36,
+  "density": true
+ }
+}

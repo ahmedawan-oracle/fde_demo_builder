@@ -20,6 +20,10 @@ Gates (GATE_NAMES, in order):
   idle wobble   static WARN (never FAIL): Math.sin/cos of t feeding a transform/left/top in an authored
                 scene outside an element marked data-diegetic — the idle loop the doctrine bans.
 
+Holds (v5.1): a row whose cut ends a held segment (out/timeline.json holds[] / shots[].hold — gates/hold_gate.py)
+is skipped by `seams move`: a recreated beat moves first and then holds, so its exit is still by design and the
+hold gate owns that frame. The row is still validated by `seam ledger` and still guarded by `seam flash`.
+
 Ledger source: out/timeline.json "seams" (written by export_timeline.js from seams.json via lib/seams.js)
 or, failing that, <project>/seams.json (qa.json "seams" overrides the path); cue expressions such as
 "wt('ask','question')" or "P.close" are resolved here from scenes/timing_<name>_data.js. No ledger = the
@@ -56,6 +60,9 @@ W, H = 640, 360                # measurement frame (grey), same as qa_film.py's 
 ZW, ZH = 320, 180              # z search frame
 RESERVED = ('y-1', 'z+1', 'z-1')
 CAUSES = ('click', 'chapter', 'impact')
+# shader seams (ledger type 'gl', drawn by lib/shaders.js): window = dur split around the cut; these two brighten by design
+GL_DUR, GL_SPLIT = 0.3, 0.5
+GL_BRIGHT = ('flashwhite', 'lightleak', 'flash', 'leak')
 # per-technique exit window (seconds before the cut) when the row does not say: the waterfall's last word
 # dies 0.02 s before the cut, so its streak is measured a little earlier
 EXIT_WINDOW = {'waterfall': (0.20, 0.10)}
@@ -204,6 +211,33 @@ def is_static(m, axis, width=W):
 
 
 # ------------------------------------------------------------------------------------------ per-cut checks
+def check_gl_seam(film, row, fps=30, dur=None):
+    """frame checks for a shader seam → (ok, warn, [lines]). The two sides may mix inside the window (that is the
+    transition), so the vector tests do not apply; instead the window must (a) change the picture end to end and
+    (b) be in progress at its middle — a frozen or absent shader pass reads as a plain hard cut or a hole."""
+    c = float(row['cut'])
+    d = float(row.get('dur', GL_DUR)); s = float(row.get('split', GL_SPLIT))
+    t0, t1 = c - d * s, c + d * (1 - s)
+    k0, k1 = cut_frame(t0, fps), cut_frame(t1, fps)
+    km = (k0 + k1) // 2
+    frames = decode(film, k0 - 1, (k1 - k0) + 3, fps)
+    if len(frames) < (k1 - k0) + 3:
+        return False, False, ['%s: could not decode frames around %.3f s' % (row.get('id', '?'), c)]
+    F = lambda k: frames[k - (k0 - 1)]
+    tag = '%s gl:%s @%.3f (%.2f s)' % (row.get('id', 'seam'), row.get('technique', '?'), c, d)
+    a, b, m = F(k0 - 1), F(k1 + 1), F(km)
+    ends = mad(a, b)
+    lines, ok, warn = [], True, False
+    if ends < THRESH['min_change']:
+        warn = True; lines.append('%s: WARN the two sides barely differ (mad %.2f) — is this a cut?' % (tag, ends))
+    da, db = mad(m, a), mad(m, b)
+    if da < 0.5 or db < 0.5:
+        ok = False; lines.append('%s: FAIL window middle equals one side (mad %.2f / %.2f) — the shader pass is not drawing' % (tag, da, db))
+    else:
+        lines.append('%s: ok — ends differ %.1f, middle %.1f/%.1f from the sides' % (tag, ends, da, db))
+    return ok, warn, lines
+
+
 def check_seam(film, row, fps=30, dur=None):
     """frame checks for one ledger row → (ok, warn, [lines]). Rows of type match-cut/morph skip the vector
     checks (their motion may start at the boundary) and keep the overlap test."""
@@ -294,6 +328,18 @@ def validate_rows(rows):
         if c in seen:
             errors.append('%s: duplicate cut time %s' % (rid, c))
         seen.add(c)
+        if typ == 'gl':
+            tech = str(r.get('technique') or '')
+            d = r.get('dur', GL_DUR)
+            if not tech:
+                errors.append('%s: gl rows name the transition in technique (chromaSplit, warpDissolve, lightLeak, flashWhite, iris, slitScan, crossWarp)' % rid)
+            if not (isinstance(d, (int, float)) and 0.1 <= d <= 0.5):
+                errors.append('%s: gl seam dur %r is outside 0.1–0.5 s (a transition over footage never exceeds half a second)' % (rid, d))
+            if tech:
+                techs.add('gl:' + tech)
+            if tech.lower().startswith(('whip', 'zoom', 'cinematic')) and r.get('cause') not in CAUSES:
+                errors.append('%s: a whip/zoom shader seam needs a cause (click | chapter | impact)' % rid)
+            continue
         if typ != 'cut':
             car = r.get('carrier') or {}
             if not (car.get('out') and car.get('in')):
@@ -408,6 +454,14 @@ def _arith(s):
     return ev(ast.parse(s.strip(), mode='eval'))
 
 
+def held_cuts(ctx, near=0.05):
+    """the ledger cuts that end a held segment → skipped by 'seams move' (the hold wins)."""
+    tl = ctx.get('timeline') or {}
+    ends = [float(h['t1']) for h in tl.get('holds', []) or [] if isinstance(h, dict) and isinstance(h.get('t1'), (int, float)) and isinstance(h.get('hold'), (int, float))]
+    ends += [float(s['t1']) for s in tl.get('shots', []) or [] if isinstance(s.get('hold'), (int, float)) and isinstance(s.get('t1'), (int, float))]
+    return lambda c: any(abs(float(c) - e) <= near for e in ends)
+
+
 def load_rows(ctx):
     """ledger rows with numeric cuts: timeline.json "seams" first, then <project>/seams.json. Returns
     (rows, source, errors)."""
@@ -485,19 +539,25 @@ def run(ctx):
         if warnings:
             det += '  WARN ' + ' | '.join(warnings)
         res.append(('seam ledger', not errors, ('; '.join(errors)[:300] if errors else det)))
-        bad, warn, n = [], [], 0
+        bad, warn, n, held = [], [], 0, []
+        is_held = held_cuts(ctx)
         for r in rows:
             if not isinstance(r.get('cut'), (int, float)) or not inside(r['cut']):
                 continue
+            if is_held(r['cut']):
+                held.append(r.get('id', '?')); continue            # move first, then hold: the exit is still by design (hold_gate measures it)
             n += 1
-            ok, w, lines = check_seam(film, r, fps, dur)
+            ok, w, lines = (check_gl_seam if r.get('type') == 'gl' else check_seam)(film, r, fps, dur)
             if not ok:
                 bad.extend(l for l in lines if 'FAIL' in l)
             if w:
                 warn.extend(l for l in lines if 'WARN' in l)
-        det = ('%d seams move across the cut' % n) + ('  WARN ' + ' | '.join(warn)[:200] if warn else '')
+        det = ('%d seams move across the cut' % n) + (('; %d skipped, end a hold: %s' % (len(held), ', '.join(held))) if held else '') + ('  WARN ' + ' | '.join(warn)[:200] if warn else '')
         res.append(('seams move', not bad, ' | '.join(bad)[:400] if bad else det))
-    cuts = sorted(set([c for c in (ctx.get('timeline') or {}).get('cuts', []) if inside(c)] + [r['cut'] for r in rows if isinstance(r.get('cut'), (int, float)) and inside(r['cut'])]))
+    # shader seams that brighten by design (flashWhite, lightLeak) are declared, so the luma-spike check skips their cut
+    bright = set(round(r['cut'], 3) for r in rows if r.get('type') == 'gl' and str(r.get('technique', '')).lower() in GL_BRIGHT and isinstance(r.get('cut'), (int, float)))
+    cuts = sorted(set([c for c in (ctx.get('timeline') or {}).get('cuts', []) if inside(c) and round(c, 3) not in bright]
+                      + [r['cut'] for r in rows if isinstance(r.get('cut'), (int, float)) and inside(r['cut']) and round(r['cut'], 3) not in bright]))
     flashes = []
     for c in cuts:
         for k, m, a, b in check_flash(film, c, fps):
@@ -660,6 +720,13 @@ def selftest():
     check('wobble: glow on a sine of t', wobble_sites("g.top = (-260 + 60 * Math.sin(t * 0.35)).toFixed(1) + 'px';") == [1])
     check('wobble: diegetic spinner exempt', wobble_sites("/* diegetic */ sp.style.transform = 'rotate(' + Math.sin(t) + 'rad)';") == [])
     check('wobble: sine not on t is not flagged', wobble_sites("x.style.left = Math.sin(phase) + 'px';") == [])
+    # holds: a settled card followed by a hard cut is a dead beat for a footage seam, but the planned exit of a held recreated beat
+    ctxh = {'film': film, 'fps': fps, 'dur': END, 'project': tmp, 'cfg': {}, 'qa': {'seam_edges': 0.5},
+            'timeline': {'cuts': [], 'seams': [rowx(C2)], 'holds': [{'id': 'card', 't0': C1, 't1': C2, 'hold': 0.6}]}}
+    rh = {n: (ok, d) for n, ok, d in run(ctxh)}
+    check('seams move skips the row that ends a held segment', rh['seams move'][0] and 'end a hold' in rh['seams move'][1], rh['seams move'][1])
+    rh2 = {n: (ok, d) for n, ok, d in run(dict(ctxh, timeline={'cuts': [], 'seams': [rowx(C2)]}))}
+    check('without the hold the same row fails as a dead beat', not rh2['seams move'][0], rh2['seams move'][1][:80])
     print('\n%s  (%d failed)' % ('SELFTEST PASS' if not fails else 'SELFTEST FAILED', fails))
     return fails
 

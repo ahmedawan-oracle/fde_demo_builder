@@ -1,0 +1,16 @@
+{
+ "_doc": [
+  "skin.json for the booth-trailer template: a POINTER, not a skin. new-film writes `skin` into film.json \"skin\"; build_film.py",
+  "then runs tools/skin_apply.py (scenes/skin_data.js + design.md tokens) before the lint and the render.",
+  "Ember: warm near-black ground, ember accent, high motion profile, keynote captions - the booth look (skins/README.md).",
+  "Pick an alternative when the brand is light or the room is bright; run `python tools/brand_kit.py --from-skin <skin>` for the sheet",
+  "and approve the look BEFORE the sketch pass. The skin's motion profile and captions.style are the defaults the shots follow."
+ ],
+ "template": "booth-trailer",
+ "skin": "skins/ember.json",
+ "alternatives": {
+  "light": "skins/signal.json",
+  "neutral": "skins/slate.json"
+ },
+ "head_fade": "the scene's #black plate reads var(--black) from the skin: dark skins open from near-black, light skins from their own paper"
+}

@@ -8,6 +8,32 @@ window.G = (function () {
   const lerp = (a, b, x) => a + (b - a) * x;
   const EZ = x => Math.sin(clamp(x, 0, 1) * Math.PI / 2);                  // sine-out (pushes, pulls)
   const EIO = x => 0.5 - 0.5 * Math.cos(clamp(x, 0, 1) * Math.PI);          // sine-in-out (pans, scrolls, cursor)
+  /* one ease vocabulary for every lib: the role names map to the same curve whether a value is tweened by
+     lib/motion.js (GSAP string) or computed here (numeric x→y). EASE_NAME[role] → GSAP string; easeFn(nameOrRole) → function. */
+  const EASE_NAME = { push: 'sine.out', pan: 'sine.inOut', reveal: 'power4.out', exit: 'power4.in', settle: 'power3.out', expo: 'expo.out', none: 'none' };
+  const EASE_FN = {
+    'sine.in': x => 1 - Math.cos(clamp(x, 0, 1) * Math.PI / 2), 'sine.out': EZ, 'sine.inOut': EIO,
+    'power1.in': x => x, 'power1.out': x => x, 'power1.inOut': x => x,
+    'power2.in': x => x * x, 'power2.out': x => 1 - Math.pow(1 - x, 2), 'power2.inOut': x => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2),
+    'power3.in': x => x * x * x, 'power3.out': x => 1 - Math.pow(1 - x, 3), 'power3.inOut': x => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+    'power4.in': x => x * x * x * x, 'power4.out': x => 1 - Math.pow(1 - x, 4), 'power4.inOut': x => (x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2),
+    'expo.in': x => (x <= 0 ? 0 : x >= 1 ? 1 : Math.pow(2, 10 * x - 10)), 'expo.out': x => (x >= 1 ? 1 : x <= 0 ? 0 : 1 - Math.pow(2, -10 * x)),
+    'expo.inOut': x => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2),
+    none: x => clamp(x, 0, 1), linear: x => clamp(x, 0, 1) };
+  /* back.out(s) / back.in(s) / back.inOut(s): the one sanctioned overshoot (GSAP's default s = 1.70158; hud.js uses 1.6) */
+  const BACK = (kind, s) => {
+    const out = x => { x = x - 1; return 1 + (s + 1) * x * x * x + s * x * x; }, inn = x => x * x * ((s + 1) * x - s);
+    return kind === 'in' ? inn : kind === 'inOut' ? (x => (x < 0.5 ? inn(2 * x) / 2 : 0.5 + out(2 * x - 1) / 2)) : out;
+  };
+  /* easeFn(name): a role (EASE_NAME), a GSAP string ('power3.out', 'back.out(1.6)', or 'power3' = '.out'), or a function */
+  const easeFn = n => {
+    if (typeof n === 'function') return x => n(clamp(x, 0, 1));
+    let k = EASE_NAME[n] || n;
+    if (/^(power[1-4]|sine|expo|back)$/.test(k)) k += '.out';
+    const bk = /^back\.(in|out|inOut)(?:\(([\d.]+)\))?$/.exec(k);
+    const f = bk ? BACK(bk[1], bk[2] === undefined ? 1.70158 : +bk[2]) : EASE_FN[k];
+    if (!f) throw new Error('grammar.js: unknown ease ' + n); return x => f(clamp(x, 0, 1));
+  };
   const EOQ = x => 1 - Math.pow(1 - clamp(x, 0, 1), 4);                     // odometers / reveals
 
   /* ---------- camera: keyframes [{t0,dur,s,cx,cy}] ; state holds after each move; s=1 & centre = home ---------- */
@@ -102,5 +128,5 @@ window.G = (function () {
   const fadeInOut = (t, a, b, fi = 0.25, fo = 0.25) => Math.min(rmp(t, a, a + fi), 1 - rmp(t, b - fo, b));
   const words = (s, t, t0, step = 0.1, fade = 0.3) => s.split(' ').map((w, i) => `<span style="opacity:${rmp(t, t0 + i * step, t0 + i * step + fade).toFixed(3)}">${w}</span>`).join(' ');
 
-  return { clamp, rmp, lerp, EZ, EIO, EOQ, camState, applyCam, pushTo, pullHome, typer, odo, planLine, timer, staged, cursorAt, placeCursor, fadeInOut, words };
+  return { clamp, rmp, lerp, EZ, EIO, EOQ, EASE_NAME, EASE_FN, easeFn, camState, applyCam, pushTo, pullHome, typer, odo, planLine, timer, staged, cursorAt, placeCursor, fadeInOut, words };
 })();

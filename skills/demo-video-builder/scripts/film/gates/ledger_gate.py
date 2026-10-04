@@ -83,7 +83,7 @@ def referenced_assets(ctx):
     name = cfg.get('name', 'film')
     add = lambda rel, kind: refs.append((rel.replace('\\', '/'), kind)) if (rel and (rel.replace('\\', '/'), kind) not in refs) else None
     if cfg.get('bed'): add(cfg['bed'], 'music')
-    if cfg.get('sfx'): add(cfg['sfx'], 'sfx')
+    if isinstance(cfg.get('sfx'), str) and cfg['sfx']: add(cfg['sfx'], 'sfx')     # "sfx": {"auto": true} synthesizes its stem at build time: nothing to licence
     if os.path.exists(os.path.join(project, 'vo_%s.mp3' % name)): add('vo_%s.mp3' % name, 'voice')
     cj = os.path.join(project, 'clips.json')
     if os.path.exists(cj):

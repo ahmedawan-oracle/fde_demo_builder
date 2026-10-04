@@ -45,6 +45,14 @@ Find issues → fix in `demo_config.py` (spans/masks/vo/zoom/freeze) → `python
 - [ ] The last seconds show, centred in the footer: **Crafted with FDE Demo Builder · by Ahmed Awan**.
       `python credit.py check out/<video>.mp4` → PRESENT. Missing, reworded, cropped or covered = BLOCKER.
 
+## v4 / v5 film gates
+
+`python qa_film.py --profile=picture` runs the 12 picture gates; `--profile=full` runs every plug-in module
+(seams, camera, overlays, audio, lint, canary, golden, text, grade, ledger, leaks, sfx, reveals, charts,
+annotation, skins). The index with every gate and its rule is `qa-gates.md`; the
+`demo-qa-reviewer` agent's v5 blockers are leaks, recoloured or transitioned-over footage, chart values
+without a claim, marks off their evidence, and the credit.
+
 ## v3 film gates (`python qa_film.py`)
 container · duration vs narration · open frame · black frames · cuts land (relative) · blank after cut ·
 no freeze > 5 s (640x360) · loudness −16 LUFS / TP ≤ −1 · required lines · no over-claims (rendered text,

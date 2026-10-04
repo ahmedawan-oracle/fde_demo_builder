@@ -18,12 +18,17 @@ Default times: every chunk boundary the render will use (round(k*N/W)/fps), the 
 (title card) and END - 0.05 s (tail), capped at qa.json canary.max_times (default 8). Same machine: PASS only
 on identical sha256 of the raw pixels. `--cross-machine` relaxes to PSNR >= 40 dB (fonts and Chrome builds drift
 across machines unless fonts are localized). On a mismatch a diff PNG (|a-b| x 8) and the changed-pixel % are
-written next to the frames. Set RENDER_SOFTWARE_GPU=1 to add --disable-gpu when a GPU rasterizes blur or
-gradients non-deterministically (then do the same for the render).
+written next to the frames. Chrome runs on the software GL path by default, exactly like render_frames.js
+(SwiftShader behind ANGLE, GPU process off): WebGL2 is available, frames do not depend on the machine's GPU,
+and a DOM screenshot is ~2x faster than through the GPU process. RENDER_GL=hardware opts out of both.
 
-Chrome runs with the determinism flags HyperFrames pins: --font-render-hinting=none, --disable-lcd-text,
---force-color-profile=srgb, --disable-background-timer-throttling, --disable-renderer-backgrounding. The probe
-waits for document.fonts.ready before the first seek and awaits the decode Promise __seek/__step return.
+Chrome is launched with the same switches render_frames.js uses (no font hinting, no LCD text, sRGB colour
+profile, background throttling off, compositor sync on). The probe mirrors the renderer step for step: every
+declared @font-face is loaded explicitly, the cold frame is re-captured until two captures match (first-frame
+settle), every __seek/__step decode Promise is awaited, and two animation frames pass between the last step and
+the screenshot so the compositor has committed what the step wrote. Every probed time sits exactly on the frame
+grid (round(t*fps)/fps, never rounded to milliseconds): the cold seek and the stepped path must land on the same
+instant or a gliding glyph reports a seam that is not there.
 
 Public API (gates/snapshot.py reuses the probe):
   probe(scene, times, mode, out_dir, prefix='', approach=1.0, fps=30, dpr=1.5, png=True) -> {t: path}, meta
@@ -70,11 +75,31 @@ const FPS = parseInt(FPS_S || '30', 10), DPR = parseFloat(DPR_S || '1.5'), PNG =
 const [sp, sq] = SCENE.split('?');
 const URL = 'file://' + path.resolve(sp) + '?' + (sq ? sq + '&' : '') + 'render';
 const flags = JSON.parse(process.env.PROBE_FLAGS || '[]');
-if (process.env.RENDER_SOFTWARE_GPU === '1') flags.push('--disable-gpu');
+// same GL path as render_frames.js: software rasteriser (SwiftShader behind ANGLE) unless RENDER_GL=hardware
+if (process.env.RENDER_GL !== 'hardware') flags.push('--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu');
+// and the same compositor sync: every raster stage finishes before a frame is drawn (scaled nested layers otherwise differ run to run)
+const SYNC_FLAGS_WANTED = process.env.RENDER_COMPOSITOR_SYNC !== '0';
+/* capture probe (v5.1, shared with render_frames.js): on some Chrome builds the compositor-sync flags make Page.captureScreenshot
+   wait forever for a frame that is never drawn. One plain page is screenshotted with a 30 s race; a hang kills that Chrome and
+   relaunches without the flags. */
+const SYNC_FLAGS = ['--run-all-compositor-stages-before-draw', '--disable-checker-imaging', '--disable-threaded-animation', '--disable-image-animation-resync'];
+async function launchWithProbe(mk) {
+  let b = await mk(SYNC_FLAGS_WANTED ? SYNC_FLAGS : []), sync = SYNC_FLAGS_WANTED ? 'on' : 'off';
+  if (SYNC_FLAGS_WANTED) {
+    const probe = async () => { const p = await b.newPage(); await p.setViewport({ width: 320, height: 180, deviceScaleFactor: 1 });
+      await p.goto('data:text/html,<body style="margin:0;background:%23082A34"><div style="width:100px;height:50px;background:%23fff"></div></body>');
+      await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await p.screenshot({ type: 'png', clip: { x: 0, y: 0, width: 32, height: 32 } }); await p.close(); return true; };
+    const ok = await Promise.race([probe().catch(() => false), new Promise(r => setTimeout(() => r(false), 30000))]);
+    if (!ok) { console.error('WARN compositor-sync flags hang Page.captureScreenshot on this Chrome — relaunching without them'); try { b.process() && b.process().kill('SIGKILL'); } catch (e) {} b = await mk([]); sync = 'off (fallback: capture hung with the sync flags)'; }
+  }
+  return [b, sync];
+}
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const errors = [], files = {};
-  const b = await puppeteer.launch({ headless: 'new', executablePath: chromePath(), args: flags.concat(['--force-device-scale-factor=' + DPR, '--window-size=1280,760']) });
+  const [b, compositorSync] = await launchWithProbe(sync => puppeteer.launch({ headless: 'new', executablePath: chromePath(), protocolTimeout: 900000,
+    args: flags.concat(sync, ['--force-device-scale-factor=' + DPR, '--window-size=1280,760']) }));
   const version = await b.version();
   for (const ts of TIMES.split(',').filter(Boolean)) {
     const t = parseFloat(ts);
@@ -83,16 +108,30 @@ if (process.env.RENDER_SOFTWARE_GPU === '1') flags.push('--disable-gpu');
     p.on('requestfailed', r => { if (!/ERR_ABORTED/.test(r.failure() && r.failure().errorText || '')) errors.push('REQFAILED ' + r.url().slice(-80)); });
     await p.setViewport({ width: 1280, height: 720, deviceScaleFactor: DPR });
     await p.goto(URL, { waitUntil: 'load', timeout: 120000 });
-    await p.evaluate(() => document.fonts.ready);
+    // mirror render_frames.js: load every declared @font-face explicitly (src:local() faces settle up to ~1 s after fonts.ready)
+    await p.evaluate(async () => { await document.fonts.ready; const faces = []; document.fonts.forEach(f => faces.push(f)); await Promise.all(faces.map(f => f.load().catch(() => null))); });
     await new Promise(r => setTimeout(r, 300));
     if (MODE === 'stepped') {
       const i1 = Math.round(t * FPS), i0 = Math.max(0, i1 - Math.round(parseFloat(APPROACH || '1') * FPS));
       await p.evaluate(t => { document.body.classList.remove('pre'); return window.__seek(t); }, i0 / FPS);
       for (let i = i0 + 1; i <= i1; i++) await p.evaluate(t => (window.__step || window.__seek)(t), i / FPS);
     } else {
-      await p.evaluate(t => { document.body.classList.remove('pre'); return window.__seek(t); }, t);
+      // the cold seek lands on the frame-grid instant the stepped path ends on (i1 / FPS), whatever the csv carried
+      const tg = Math.round(t * FPS) / FPS;
+      await p.evaluate(t => { document.body.classList.remove('pre'); return window.__seek(t); }, tg);
+      // and the first-frame settle render_frames.js performs on every worker's cold frame: re-seek and capture until two
+      // consecutive captures are byte-identical (max 8 x 250 ms) — a late glyph/image paint is a warm-up, not a seam
+      for (let tries = 0, prev = null; tries < 8; tries++) {
+        const sig = require('crypto').createHash('md5').update(await p.screenshot({ type: 'png', clip: { x: 0, y: 0, width: 1280, height: 720 } })).digest('hex');
+        if (sig === prev) break;
+        prev = sig; await new Promise(r => setTimeout(r, 250));
+        await p.evaluate(t => window.__seek(t), tg);
+        if (tries === 7) errors.push('WARN t=' + ts + ' cold frame did not settle after 8 captures');
+      }
     }
     await p.evaluate(() => document.body.offsetHeight);
+    // same as render_frames.js: two animation frames so the compositor has committed and activated the last step before the capture
+    await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const f = path.join(OUT, PREFIX + ts.replace(/[^0-9.]/g, '_') + (PNG ? '.png' : '.jpg'));
     await p.screenshot(Object.assign({ path: f, type: PNG ? 'png' : 'jpeg', clip: { x: 0, y: 0, width: 1280, height: 720 } }, PNG ? {} : { quality: Q }));
     files[ts] = f.replace(/\\/g, '/');
@@ -124,7 +163,7 @@ def probe(scene, times, mode, out_dir, prefix='', approach=1.0, fps=30, dpr=1.5,
     scene = os.path.abspath(scene)
     project = project or os.path.dirname(os.path.dirname(scene))
     js = _probe_script(project)
-    tcsv = ','.join('%.3f' % t for t in times)
+    tcsv = ','.join('%.6f' % t for t in times)      # frame times carry 6 decimals so 1/30 s multiples survive the hand-over
     env = dict(os.environ, PROBE_FLAGS=json.dumps(CHROME_FLAGS))
     r = subprocess.run(['node', js, scene, os.path.abspath(out_dir), tcsv, mode, str(approach), str(fps), str(dpr), prefix,
                         '1' if png else '0', str(quality)], capture_output=True, text=True, env=env, timeout=timeout, cwd=project)
@@ -160,7 +199,10 @@ def compare(a, b, diff_png=None):
 
 
 def snap(t, fps=30):
-    return round(round(t * fps) / fps, 3)
+    """Exact frame time: the cold probe seeks to this value, the stepped probe ends on round(t*fps)/fps — they must be
+    the same instant. Rounding to 3 decimals (7.833 vs frame 235 = 7.8333) moved a gliding title by 0.33 ms and
+    reported a 43 dB 'seek parity' failure on a scene whose paths agree to the byte."""
+    return round(t * fps) / fps
 
 
 def default_times(dur, fps=30, workers=3, cuts=(), max_times=8):

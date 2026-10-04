@@ -1,4 +1,4 @@
-# Motion doctrine: seams, the current, carriers (v4)
+# Motion doctrine: seams, the current, carriers (v5)
 
 How a film feels like one camera move instead of a stack of slides. The law is in Part 1, the catalog
 and its numbers in Part 2, the ledger + gate in Part 3, performance between seams in Part 4. Code:
@@ -14,8 +14,15 @@ How a scene leaves decides how the next one arrives:
    shrinking = pull. The classic violation is a pull-back exit answered by a grow-from-small entry.
 3. **Speed** — matched through mirrored eases: exit `power4.in`, entry `power4.out`, same distance; the
    incoming side is already past the half of its notional path when we see it.
-4. **Phase** — the cut lands mid-motion on BOTH sides. A card that settles and then cuts, or an entry that
-   starts from rest, is a dead beat (the `seams move` gate measures exactly this).
+4. **Phase — by shot type.** On a footage match-cut the cut lands mid-motion on BOTH sides: a product screen
+   that settles and then cuts, or an entry that starts from rest, is a dead beat (`seams move` measures exactly
+   this). A recreated or explainer beat owes the cut something else: a *still*. It moves first — every landing
+   inside the first part of the beat — and then holds, with nothing but a declared background drifting, so the
+   frame the next cut lands on is the end state the storyboard wrote and the reviewer approved. The hold is
+   declared as a fraction of the beat (`hold: 0.6` — the last 40 % is still), **required on recreated beats,
+   forbidden on footage match-cuts, optional on a footage shot that ends settled**. `hold_gate` measures the
+   stillness; `seams move` skips the cut that ends a held segment because the hold owns that frame. The cut still
+   lands on a word either way — what changes is which side carries the motion. → `hold-doctrine.md`
 
 **The current.** A film picks one direction for every ordinary seam — house default LEFT (`x-1`). The other
 vectors are reserved and spending one means something; spend at most one per act:
@@ -42,9 +49,11 @@ motion (partial travel + early fade, entry mid-flight). A crossfade carries noth
 reveal); the effect starts ON the causing frame, big things rebound slower, small things snap, and a force
 is the only licence to change direction. Only for recreated scenes: the recording owns its own causality.
 
-Anti-patterns: a fade between scenes; the exit completes, then the scene changes; an entry from rest; a pull
-exit answered by grow-from-small; the incoming scene's own pop-in under a z seam (hold it composed for the
-first 0.5 s); reserved vectors used as variety; a reaction a few frames after its cause.
+Anti-patterns: a fade between scenes; a footage exit that completes, then the scene changes; an entry from
+rest on a footage seam; a pull exit answered by grow-from-small; the incoming scene's own pop-in under a z seam
+(hold it composed for the first 0.5 s); reserved vectors used as variety; a reaction a few frames after its cause;
+a recreated card still landing words inside its hold window (the hold gate's failure); a hold declared on a
+footage match-cut.
 
 ## Part 2 — The catalog (lib/seams.js)
 
@@ -115,7 +124,17 @@ moves every cut and every seam together; it also re-opens every seam — rerun t
 | `seams move` | per row, on the rendered film: dominant motion (phase correlation x/y, dominant scale z) in cut−0.1 s..cut−1f and cut+1f..cut+0.1 s has the ledger's sign; the cut frame is not a mix of its neighbours | static < 15 px/s on a 1920 frame (5 px/s at 640) or < 0.04 scale/s; speed ratio > 3 WARN; blend = both neighbours' structure in the cut frame |
 | `seam flash` | frames within ±2 of every cut (timeline + ledger) | mean luma above BOTH neighbours by > 40, or > 235 while neither neighbour is |
 | `stage ground` | html/body/#stage declares an opaque background | static |
-| `idle wobble` | `Math.sin/cos(…t…)` feeding transform/left/top outside `data-diegetic` | WARN only |
+| `idle wobble` | `Math.sin/cos(…t…)` feeding transform/left/top outside `data-diegetic`, scoped to `#clipWrap` — footage never wobbles; recreated layers may breathe through their own block timeline | WARN only |
+| (`hold_gate`) `hold declared` · `hold still` | the held segments (`FILM.holds`, `shots.js hold:`): required on recreated beats, forbidden on footage match-cuts, nothing but the declared background moves inside the hold window; `seams move` skips the cut that ends a held segment | `hold-doctrine.md` |
+
+**Shader seams (v5).** The registry has three backends — `transform` (the catalog above), `css` and `gl`. A row
+with `"type": "gl"` names one of the seven GL transitions in `technique` (`chromaSplit`, `warpDissolve`,
+`lightLeak`, `flashWhite`, `iris`, `slitScan`, `crossWarp`), a `dur` within 0.1–0.5 s and a `split` (share of the
+window before the cut); it has no exit/entry vectors because the two sides are textures and the window IS the
+transition. `SEAM.glSeams()` hands the resolved rows to `GL.cutTransition`; `export_timeline.js` writes them to
+`out/timeline.json → glSeams`; the gate measures them in their window and exempts the two brightening kinds
+from `seam flash`. gl techniques count toward the ≤ 3 per film; whip/zoom kinds need a `cause`; never between two
+product screens. The honesty matrix and the numbers are in `gl-transitions.md`.
 
 `python gates/seam_gate.py probe out/<film>.mp4 <t>` prints the measured vectors around a time so a row is
 written from measurement; `--selftest` runs the synthetic film. Match-cut / morph rows (`type`) carry a
@@ -135,6 +154,12 @@ waiting. Every phase between an entry and an exit is owned by one named route:
 | Sequenced UI life | the real scroll runs, highlights step, a count ticks |
 | Animated sequence | a card files into the stack, the data particle reaches the agent box and lights it |
 | Cursor-led action | an oversized cursor (recreated scenes only) walks the eye to the click that ignites the beat |
+
+**Speed contrast (v5.1).** A film where every real-motion clip plays at 1.0× has no tempo. Product footage reads best at
+1.3–1.5× — a UI that answers briskly (the idle detector's ramps go further where nothing happens); people at ~0.8× — a face
+at 1.3× looks nervous; the slowest beat of a film sits about 3× slower than the fastest. The speeds are set in the cut list
+(`cutlist.py`, `speed` column, `--fit`) and `motion_diag`'s `seq quantized` prints every shot's rate so the ladder is read at a
+glance (WARN outside 0.5–2.0×, or when every clip sits at the same rate). → `palette-tones-and-speed-contrast.md`
 
 Test: pause at any second — something meaningful is mid-flight. Diegetic pulses (a spinner while the machine
 works) are allowed and die on the frame the result lands. Flake fields are texture, not a route. Timing

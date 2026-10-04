@@ -254,6 +254,10 @@
   const CAUSES = ['click', 'chapter', 'impact'];
   const TECH = { 'cut-the-curve': cutCurve, 'zoom-through': zoomThrough, 'inverse zoom-through': inverseZoom,
     combined, 'rack-focus': rackFocus };
+  /* shader seams (type 'gl'): no DOM transform here — the scene asks GL.cutTransition to draw the window;
+     the ledger still owns the time so every gate treats it as a scheduled seam. split = share of dur before the cut. */
+  const GL_SEAM = { dur: 0.3, split: 0.5 };
+  const glWindow = r => { const d = r.dur === undefined ? GL_SEAM.dur : r.dur, s = r.split === undefined ? GL_SEAM.split : r.split; return { exitDur: d * s, entryDur: d * (1 - s) }; };
   const vkey = v => v.axis + (v.dir > 0 ? '+1' : '-1');
 
   /* resolve a cut: a number, or an expression over P.<phase>, P.<phase>_end, wt('phase','word'[,n]),
@@ -280,6 +284,15 @@
       const id = r.id || ('row ' + i), type = r.type || 'cut';
       if (typeof r.cut !== 'number' || !isFinite(r.cut)) errors.push(id + ': cut is not resolved to seconds');
       if (seen[r.cut]) errors.push(id + ': duplicate cut time ' + r.cut); seen[r.cut] = 1;
+      if (type === 'gl') {
+        // a shader seam (lib/shaders.js GL.cutTransition): the two sides are textures, the window is the transition
+        if (!r.technique) errors.push(id + ': gl rows name the transition in technique (chromaSplit, warpDissolve, lightLeak, flashWhite, iris, slitScan, crossWarp)');
+        const d = r.dur === undefined ? GL_SEAM.dur : r.dur;
+        if (!(d >= 0.1 && d <= 0.5)) errors.push(id + ': gl seam dur ' + d + ' s is outside 0.1–0.5 s (a transition over footage never exceeds half a second)');
+        if (r.technique) techs.add('gl:' + r.technique);
+        if (/^(whip|zoom|cinematic)/i.test(r.technique || '') && CAUSES.indexOf(r.cause) < 0) errors.push(id + ': a whip/zoom shader seam needs a cause (click | chapter | impact)');
+        return;
+      }
       if (type !== 'cut') { if (!r.carrier || !r.carrier.out || !r.carrier.in) errors.push(id + ': ' + type + ' rows need carrier {out, in}'); return; }
       if (!r.exit || !r.entry) { errors.push(id + ': needs exit and entry vectors'); return; }
       for (const side of ['exit', 'entry']) {
@@ -334,8 +347,12 @@
   }
   const offset = (t, selector) => state(t)[selector] || null;
   /* windows(): [{id, cut, t0, t1, technique, exit, entry}] — what export_timeline.js writes next to cuts */
+  /* glSeams(): [{id, at, dur, name, cause}] — what a scene hands to GL.cutTransition, straight from the ledger */
+  function glSeams() {
+    return LEDGER.rows.filter(r => r.type === 'gl').map(r => { const w = glWindow(r); return { id: r.id, at: +(r.cut - w.exitDur).toFixed(3), dur: +(w.exitDur + w.entryDur).toFixed(3), split: r.split === undefined ? GL_SEAM.split : r.split, name: r.technique, cause: r.cause, opts: r.opts || {} }; });
+  }
   function windows() {
-    return LEDGER.rows.map(r => { const p = r.type !== 'cut' ? { exitDur: 0, entryDur: 0 } : r.technique === 'waterfall' ? WATERFALL
+    return LEDGER.rows.map(r => { const p = r.type === 'gl' ? glWindow(r) : r.type !== 'cut' ? { exitDur: 0, entryDur: 0 } : r.technique === 'waterfall' ? WATERFALL
       : r.technique === 'rack-focus' ? RACK : /zoom/.test(r.technique) ? (r.technique === 'zoom-through' ? ZOOM : ZOOM_INV) : CUT_CURVE;
       const o = Object.assign({}, p, r.opts || {});
       return { id: r.id, cut: r.cut, t0: +(r.cut - o.exitDur).toFixed(3), t1: +(r.cut + o.entryDur).toFixed(3), type: r.type, technique: r.technique,
@@ -370,7 +387,7 @@
     CUT_CURVE, ZOOM, ZOOM_INV, COMBINED, RACK, WATERFALL, WEIGHT, NUDGE, VECTORS, RESERVED, CAUSES,
     cutCurve, zoomThrough, inverseZoom, combined, rackFocus, waterfallCut, cascade, cascadeSchedule, nudge, nudgePhase,
     carrier, cursorHandoff, morphRect, comma, dwellOK, idle,
-    resolveCut, validate, build, state, offset, windows, toJSON, applyLayer, apply, ledger: () => LEDGER };
+    GL_SEAM, glSeams, resolveCut, validate, build, state, offset, windows, toJSON, applyLayer, apply, ledger: () => LEDGER };
   if (typeof module !== 'undefined' && module.exports) module.exports = SEAM;
   root.SEAM = SEAM;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,4 +1,4 @@
-# vo_script.example.py (v3 film) — the narration that drives film.example.html. Copy to vo_script.py.
+# vo_script.example.py (v5 film) — the narration that drives film.example.html. Copy to vo_script.py.
 #
 # Everything is FICTIONAL ("Acme", synthetic numbers) and matches make_sample_recording.py.
 # One SCENE = the whole film: the phases play back-to-back and ARE the clock. Every cut, scroll, push,
@@ -21,9 +21,9 @@ SCENES = {
             {"name": "hook", "voice": "narrator", "text":
              "Every Monday, the operations lead at Acme asks the same question. And every Monday, it takes a day to answer."},
             {"name": "title", "voice": "narrator", "text":
-             "Acme is fictional, and so is its data. The workflow is the point."},
+             "Monday, answered. Acme is fictional, and so is its data. The workflow is the point."},
             {"name": "nb", "voice": "analyst", "text":
-             "My notebook loads the orders, filters the late deliveries, and counts them by region."},
+             "My notebook loads the orders, filters the late deliveries, and counts them by region. Three regions are over target."},
             {"name": "ask", "voice": "lead", "text":
              "Which regions missed their on-time delivery target last week?"},
             {"name": "answer", "voice": "assistant", "text":

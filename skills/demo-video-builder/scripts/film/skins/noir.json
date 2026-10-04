@@ -1,0 +1,211 @@
+{
+ "name": "noir",
+ "label": "Noir",
+ "when_to_use": "Premium, understated product films: monochrome ground with a single red focal colour, documentary captions, calm pace.",
+ "background": "dark",
+ "mood": "corporate",
+ "tokens": {
+  "paper": {
+   "type": "color",
+   "default": "#0E0E10",
+   "role": "style",
+   "description": "stage background (top of the gradient)"
+  },
+  "paper2": {
+   "type": "color",
+   "default": "#212126",
+   "role": "style",
+   "description": "stage background (bottom of the gradient)"
+  },
+  "ink": {
+   "type": "color",
+   "default": "#F2F2EE",
+   "role": "style",
+   "description": "title and lower-third text"
+  },
+  "ink-soft": {
+   "type": "color",
+   "default": "#E8DBC6",
+   "role": "style",
+   "description": "subtitle text"
+  },
+  "muted": {
+   "type": "color",
+   "default": "#9A9A96",
+   "role": "style",
+   "description": "caption line, lower-third label, glow"
+  },
+  "accent": {
+   "type": "color",
+   "default": "#E63946",
+   "role": "style",
+   "description": "rule, highlight boxes, lower-third edge — one focal element per beat"
+  },
+  "gold": {
+   "type": "color",
+   "default": "#D8C9A3",
+   "role": "style",
+   "description": "first line of the closing card"
+  },
+  "black": {
+   "type": "color",
+   "default": "#07070A",
+   "role": "style",
+   "description": "head fade plate"
+  },
+  "title-font": {
+   "type": "font",
+   "default": "Cambria, Georgia, serif",
+   "role": "style",
+   "description": "title + closing card face (local system family)"
+  },
+  "body-font": {
+   "type": "font",
+   "default": "Arial, Helvetica, sans-serif",
+   "role": "style",
+   "description": "subtitles, captions, lower-thirds"
+  },
+  "title-size": {
+   "type": "number",
+   "default": 64,
+   "min": 44,
+   "max": 84,
+   "step": 2,
+   "unit": "px",
+   "role": "layout",
+   "description": "title h1 size on the 1280x720 stage"
+  },
+  "title": {
+   "type": "string",
+   "default": "Monday, answered.",
+   "role": "content",
+   "portrays": [
+    "subject_tagline"
+   ],
+   "binds": "#tTitle"
+  },
+  "subtitle": {
+   "type": "string",
+   "default": "From an analyst’s notebook to a question anyone can ask",
+   "role": "content",
+   "portrays": [
+    "subject_tagline"
+   ],
+   "binds": "#tSub"
+  },
+  "caption": {
+   "type": "string",
+   "default": "Fictional company · synthetic data",
+   "role": "content",
+   "portrays": [
+    "authority_badge"
+   ],
+   "binds": "#tCap",
+   "description": "the honesty line; keep it unless the film shows a real customer’s own data with their approval"
+  },
+  "logo": {
+   "type": "image",
+   "default": null,
+   "role": "content",
+   "portrays": [
+    "subject_logo"
+   ],
+   "binds": "#logo",
+   "description": "local file inside the project (assets/…); null hides the slot"
+  },
+  "density": {
+   "type": "enum",
+   "default": "booth",
+   "options": [
+    "booth",
+    "desk"
+   ],
+   "role": "layout",
+   "description": "booth = larger type, fewer words on screen"
+  }
+ },
+ "forbidden_tokens": [
+  "narration",
+  "fps",
+  "width",
+  "height",
+  "total",
+  "codec",
+  "credit"
+ ],
+ "css_snippet": ":root{--paper:#0E0E10;--paper2:#212126;--ink:#F2F2EE;--ink-soft:#E8DBC6;--muted:#9A9A96;--accent:#E63946;--gold:#D8C9A3;--black:#07070A;--title-font:Cambria, Georgia, serif;--body-font:Arial, Helvetica, sans-serif;--title-size:64px}",
+ "type": {
+  "mood": "corporate",
+  "display": "Cambria",
+  "body": "Arial",
+  "mono": "Consolas",
+  "display_weight": 400,
+  "display_file": "cambria.ttc",
+  "body_file": "arial.ttf",
+  "body_bold_file": "arialbd.ttf",
+  "mono_file": "consola.ttf",
+  "title_css": "Cambria, Georgia, serif",
+  "body_css": "Arial, Helvetica, sans-serif",
+  "mono_css": "Consolas, \"Courier New\", monospace",
+  "sizes_stage_px": {
+   "title": 64,
+   "subtitle": 22,
+   "body": 22,
+   "label": 13,
+   "mono": 18
+  }
+ },
+ "motion": {
+  "profile": "calm",
+  "enter_s": 0.6,
+  "exit_s": 0.45,
+  "stagger_total_s": 0.5,
+  "per_item_s": 0.08,
+  "push_s": 1.4,
+  "push_scale": [
+   1.3,
+   1.6
+  ],
+  "hold_s": 2.5,
+  "first_motion_s": 0.2,
+  "offset_after_cut_s": 0.3,
+  "rack_focus_min_gap_s": null,
+  "eases": {
+   "enter": "power4.out",
+   "exit": "sine.in",
+   "push": "sine.out",
+   "pan": "sine.inOut"
+  }
+ },
+ "captions": {
+  "style": "documentary",
+  "ink": "light"
+ },
+ "seams": {
+  "current": "x-1",
+  "allowed": [
+   "cut-the-curve",
+   "inverse zoom-through"
+  ],
+  "max_techniques": 3
+ },
+ "brand": {
+  "source": "composed from hand-picked colours",
+  "given": {
+   "paper": "#0E0E10",
+   "ink": "#F2F2EE",
+   "muted": "#9A9A96",
+   "accent": "#E63946",
+   "gold": "#D8C9A3"
+  }
+ },
+ "contrast": {
+  "ink": 17.18,
+  "ink-soft": 14.12,
+  "muted": 6.83,
+  "accent": 4.63,
+  "gold": 11.76,
+  "paper2": 1.2
+ },
+ "generated_by": "tools/brand_kit.py (deterministic: same inputs → identical file)"
+}
