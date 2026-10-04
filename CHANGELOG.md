@@ -1,6 +1,7 @@
 # Changelog
 
 ## 5.1.0 — Frames first, then motion (Wave 1)
+- Studio server guard: Host allow-list on every request, per-session token + Origin check on `/tap` and `/qa`, POST → 405 (same discipline as the review pack server); selftest cases added.
 
 v5.1 adds the review discipline of a storyboard that is approved on stills before anything moves, a hold doctrine
 by shot type, a whole-cut review whose notes become decisions, and the edit as a text cut list. Everything renders

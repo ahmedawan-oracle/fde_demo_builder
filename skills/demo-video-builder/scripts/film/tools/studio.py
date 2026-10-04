@@ -70,6 +70,7 @@ import json
 import mimetypes
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -493,8 +494,14 @@ class Watcher(threading.Thread):
             return {'version': self.version, 'changed': self.changed if self.version > since else []}
 
 
-def make_handler(project, scene, watcher, node_path, verbose):
+def make_handler(project, scene, watcher, node_path, verbose, guard=None):
+    """guard = {'hosts', 'origins', 'token'} — filled by serve() once the port is known. Every request must carry a Host of
+    127.0.0.1:<port> / localhost:<port> (a page on another site cannot forge Host, so neither a rebinding nor a cross-site
+    page reaches the server); the two routes that start a subprocess (/tap, /qa) also need the per-session token the served
+    page embeds (<meta name="studio-token"> → X-Studio-Token) and, when an Origin header is present, an allowed origin.
+    POST is not a verb this server has: 405."""
     proj_root = os.path.realpath(project)
+    G = guard if guard is not None else {'hosts': set(), 'origins': set(), 'token': secrets.token_hex(16)}
 
     class H(BaseHTTPRequestHandler):
         server_version = 'fde-studio/1.0'
@@ -537,16 +544,31 @@ def make_handler(project, scene, watcher, node_path, verbose):
         def do_HEAD(self):
             self.do_GET()
 
+        def _host_ok(self):
+            h = (self.headers.get('Host') or '').strip().lower()
+            return (not G['hosts']) or h in G['hosts']
+
+        def _token_ok(self):
+            if (self.headers.get('X-Studio-Token') or '') != G['token']:
+                return False
+            o = (self.headers.get('Origin') or '').strip().lower()
+            return (not o) or (not G['origins']) or o in G['origins']
+
         def do_POST(self):
-            self.do_GET()
+            self._send(405, {'error': 'this server only answers GET'})
 
         def do_GET(self):
+            if not self._host_ok():
+                return self._send(403, {'error': 'bad Host'})
             u = urllib.parse.urlsplit(self.path)
             q = dict(urllib.parse.parse_qsl(u.query))
             p = u.path
             try:
                 if p in ('/', '/index.html', '/studio', '/studio/'):
-                    return self._file(STUDIO_DIR, 'ui.html')
+                    with open(os.path.join(STUDIO_DIR, 'ui.html'), 'rb') as fh:
+                        page = fh.read().decode('utf-8')
+                    page = page.replace('<meta charset="utf-8">', '<meta charset="utf-8"><meta name="studio-token" content="%s">' % G['token'], 1)
+                    return self._send(200, page, 'text/html; charset=utf-8')
                 if p.startswith('/studio/'):
                     return self._file(STUDIO_DIR, p[len('/studio/'):])
                 if p.startswith('/p/'):
@@ -559,6 +581,8 @@ def make_handler(project, scene, watcher, node_path, verbose):
                     since = int(q.get('since', '0') or 0)
                     timeout = min(LONGPOLL_MAX_S, float(q.get('timeout', LONGPOLL_MAX_S) or LONGPOLL_MAX_S))
                     return self._send(200, watcher.wait(since, timeout))
+                if p in ('/tap', '/qa') and not self._token_ok():
+                    return self._send(403, {'error': 'missing or wrong X-Studio-Token (reload the studio page)'})
                 if p == '/tap':
                     try:
                         t = float(q.get('t', '0'))
@@ -582,14 +606,19 @@ def serve(project, scene=None, host=DEFAULT_HOST, port=DEFAULT_PORT, node_path=N
     project = os.path.abspath(project)
     watcher = Watcher(project)
     watcher.start()
-    handler = make_handler(project, scene, watcher, node_path, verbose)
+    guard = {'hosts': set(), 'origins': set(), 'token': secrets.token_hex(16)}
+    handler = make_handler(project, scene, watcher, node_path, verbose, guard)
     try:
         httpd = ThreadingHTTPServer((host, port), handler)
     except OSError as e:
         sys.stderr.write('studio: cannot bind %s:%d (%s) — is another studio running? try --port\n' % (host, port, e))
         return None
     httpd.daemon_threads = True
-    url = 'http://%s:%d/' % (host, httpd.server_address[1])
+    bound = httpd.server_address[1]
+    guard['hosts'] = {'127.0.0.1:%d' % bound, 'localhost:%d' % bound, '[::1]:%d' % bound}
+    guard['origins'] = {'http://127.0.0.1:%d' % bound, 'http://localhost:%d' % bound}
+    httpd.token = guard['token']
+    url = 'http://%s:%d/' % (host, bound)
     if block:
         cfg = project_config(project)
         print('studio  %s  project=%s  scene=%s  fps=%d  (Ctrl-C to stop)' % (url, project, scene or cfg['scene'], cfg['fps']))
@@ -687,6 +716,20 @@ def selftest(with_tap=False, node_path=None):
         except urllib.error.HTTPError as e:
             st = e.code
         check(st == 404, 'path traversal refused')
+        def get_h(path, headers, method='GET'):
+            req = urllib.request.Request(url.rstrip('/') + path, headers=headers, method=method)
+            try:
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        check(get_h('/api/project', {'Host': 'evil.example:80'}) == 403, 'guard: foreign Host -> 403')
+        check(get_h('/qa', {}) == 403, 'guard: /qa without the session token -> 403')
+        check(get_h('/qa', {'X-Studio-Token': 'nope'}) == 403, 'guard: /qa with a wrong token -> 403')
+        check(get_h('/qa', {'X-Studio-Token': srv['httpd'].token, 'Origin': 'http://evil.example'}) == 403, 'guard: foreign Origin -> 403')
+        check(get_h('/api/project', {}, 'POST') == 405, 'guard: POST -> 405')
+        st, body = get('/')
+        check(st == 200 and ('studio-token" content="%s"' % srv['httpd'].token).encode('utf-8') in body, 'studio page embeds the session token')
         try:
             st, body = get('/')
             check(st == 200 and b'studio' in body.lower(), 'GET / serves studio/ui.html')

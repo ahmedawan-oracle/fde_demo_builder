@@ -1,3 +1,5 @@
+/* the per-session token the server wrote into <meta name="studio-token">: /tap and /qa refuse requests without it */
+const TOKHDR = () => ({ 'X-Studio-Token': (document.querySelector('meta[name="studio-token"]') || {}).content || '' });
 /* studio.js — the preview studio's controller (served by tools/studio.py; see ui.html).
 
    The scene lives in an iframe at 1280x720 and exposes the render contract: window.__seek(t) (full reset,
@@ -217,7 +219,7 @@
   async function tap() {
     const b = $('#btnTap'); if (b.classList.contains('busy')) return; b.classList.add('busy'); $('#tapStatus').textContent = 'rendering frame ' + Math.round(S.t * S.fps) + ' through render_frames.js…';
     try {
-      const r = await fetch('/tap?t=' + fmt(S.t)); const j = await r.json();
+      const r = await fetch('/tap?t=' + fmt(S.t), { headers: TOKHDR() }); const j = await r.json();
       if (j.ok) { $('#tapStatus').textContent = j.wall_s + ' s · ' + (j.renderer && j.renderer.gl || '') + ' · ' + Math.round(j.size / 1024) + ' KB'; $('#taps').prepend(tapCard(j.png, 'f' + String(j.frame).padStart(5, '0') + ' · ' + j.t.toFixed(2) + 's')); toast('tap → ' + j.png); }
       else { $('#tapStatus').textContent = 'failed'; const e = document.createElement('a'); e.className = 'err'; e.textContent = j.error + (j.stderr ? ' — ' + j.stderr.slice(-300) : ''); $('#taps').prepend(e); }
     } catch (e) { $('#tapStatus').textContent = 'failed: ' + e.message; }
@@ -226,7 +228,7 @@
   async function qa() {
     const b = $('#btnQA'); if (b.classList.contains('busy')) return; b.classList.add('busy'); $('#qaStatus').textContent = 'running lint_scene.py…';
     try {
-      const r = await fetch('/qa'); const j = await r.json(); const box = $('#qa');
+      const r = await fetch('/qa', { headers: TOKHDR() }); const j = await r.json(); const box = $('#qa');
       if (j.error) { box.innerHTML = '<div class="bad">' + esc(j.error) + '</div>'; }
       else {
         const counts = Object.entries(j.counts || {}).map(([k, v]) => v + ' ' + k).join(' · ') || 'no findings';

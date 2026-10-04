@@ -63,6 +63,14 @@ python tools/studio.py --qa              # quick lint, JSON
 python tools/studio.py --selftest [--with-tap]   # 14 checks (16 with a tap) on a synthetic fixture, ~2 s (≈ 9 s with the tap)
 ```
 
+### Who may talk to the studio server
+The studio binds 127.0.0.1 and answers GET only (POST is 405). Every request must carry a Host of `127.0.0.1:<port>`,
+`localhost:<port>` or `[::1]:<port>`; a page on another site cannot forge that header, so a rebinding or cross-site page
+never reaches the routes. The two routes that start a subprocess, `/tap` and `/qa`, also need the per-session token the
+served page embeds in `<meta name="studio-token">` and sends back as `X-Studio-Token`, and when the browser adds an
+`Origin` header it must be the studio's own. Anything else is 403; reloading the page refreshes the token. The selftest
+covers the foreign Host, missing and wrong token, foreign Origin and POST cases.
+
 ## Review pack — `tools/review_pack.py`
 
 ```
