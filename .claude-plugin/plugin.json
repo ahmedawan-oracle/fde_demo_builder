@@ -1,7 +1,7 @@
 {
   "name": "fde-demo-builder",
-  "version": "5.1.0",
-  "description": "Turn a raw screen recording into a polished, VO-narrated demo video — fully scripted (ffmpeg + edge-tts + headless Chrome), no video editor. v2: word-synced animated b-roll + multi-voice narration. v3: booth-ready production films from real pixels (original screen → zoom, real scrolls and typing), narration as the clock, deterministic render, linear-loudness mastering, QA gates. v4: production craft — velocity-matched seams, camera kit, caption lane + overlays, voice carve + audio gates, scene lint + determinism canary, BRIEF/STORYBOARD review loop, blocks, media ledger + export presets, honest finishing. v5: the picture layer — GSAP timelines on the clock, kinetic typography, WebGL transitions in declared seam windows, three.js 3D titles, story blocks, light / depth / hand-drawn annotation / frosted glass, hero reveals, a redrawn cursor and camera from recorded telemetry, idle detection, an OCR privacy leak gate, karaoke captions + .ass sidecars + chapters, staging and vertical reflow, brand kits + ten skins, a live studio, an offline review pack, synthesized SFX and bus chains — all rendered on software GL so two renders are byte-identical, with product pixels never recoloured. Every video carries the mandatory 'Crafted with FDE Demo Builder · by Ahmed Awan' end-screen credit.",
+  "version": "5.2.0",
+  "description": "Turn a raw screen recording into a polished, VO-narrated demo video — fully scripted (ffmpeg + edge-tts + headless Chrome), no video editor. v2: word-synced animated b-roll + multi-voice narration. v3: booth-ready production films from real pixels (original screen → zoom, real scrolls and typing), narration as the clock, deterministic render, linear-loudness mastering, QA gates. v4: production craft — velocity-matched seams, camera kit, caption lane + overlays, voice carve + audio gates, scene lint + determinism canary, BRIEF/STORYBOARD review loop, blocks, media ledger + export presets, honest finishing. v5: the picture layer — GSAP timelines on the clock, kinetic typography, WebGL transitions in declared seam windows, three.js 3D titles, story blocks, light / depth / hand-drawn annotation / frosted glass, hero reveals, a redrawn cursor and camera from recorded telemetry, idle detection, an OCR privacy leak gate, karaoke captions + .ass sidecars + chapters, staging and vertical reflow, brand kits + ten skins, a live studio, an offline review pack, synthesized SFX and bus chains — all rendered on software GL so two renders are byte-identical, with product pixels never recoloured. v5.2: showreel motion for pitch films and team reels — an iso voxel field that lands back on its flat grid, a split-panel slam, pixel-matrix wipes at the big cuts, light-speed bursts and ripple rings, a glossy liquid core on WebGL, outline marquees, smear trails and a film HUD (lib/reel.js), all pure functions of t. Every video carries the mandatory 'Crafted with FDE Demo Builder · by Ahmed Awan' end-screen credit.",
   "author": {
     "name": "Ahmed Awan - Forward Deployed Engineering Team",
     "email": "232676096+ahmedawan-oracle@users.noreply.github.com"
@@ -31,6 +31,7 @@
     "loudness",
     "lower-thirds",
     "media-ledger",
+    "metaball",
     "multi-voice",
     "ocr",
     "production-film",
@@ -40,6 +41,7 @@
     "screen-recording",
     "seams",
     "sfx",
+    "showreel",
     "skins",
     "software-gl",
     "storyboard",
@@ -49,6 +51,7 @@
     "video",
     "voice-carve",
     "voiceover",
+    "voxel",
     "webgl-transitions",
     "word-sync"
   ]

@@ -29,7 +29,7 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      `make_sample_recording.py` (unchanged)
    - `film.example.html` → `scenes/film.html` · `shots.example.js` → `scenes/shots.js`
    - `lib/*.js` → `scenes/lib/` (all of them: grammar, timeline, footage, camera, seams, captions, overlays, blocks, vfx,
-     motion, typo, shaders, title3d, blocks2, light, depth, annotate, glass, reveals, stage, charts, compare, cursor, hud)
+     motion, typo, shaders, title3d, blocks2, light, depth, annotate, glass, reveals, stage, charts, compare, cursor, hud, reel)
    - `gates/*.py` → `gates/` · `tools/*` → `tools/` · `audio/*.py` → `audio/` · `skins/` → `skins/` · `studio/` → `studio/`
 3. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/` copy `gen_vo_multivoice.py`, `credit.py` and
    `requirements.txt` into `$1/`.

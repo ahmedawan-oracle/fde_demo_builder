@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.2.0 — Showreel motion (`lib/reel.js`)
+
+For pitch films and team reels: the grammar of a motion-design reel on the recreated layer, as nine pure functions
+of the film clock (no GSAP, no randomness). → `references/showreel-motion.md`, `scripts/film/scenes_reel_demo.html`
+
+- **`REEL.voxel` + `REEL.view` + `REEL.project`** — a flat grid seen as an iso field of cubes whose heights and colours
+  the scene drives (fill, crest ripple, living wave); the camera intro-settles, sways, and un-tilts to top-down with
+  heights → 0 at `flatAt`, landing every cell exactly on its flat DOM position for a seamless hand-off.
+- **`REEL.stinger` + `REEL.coverAt`** — pixel-matrix cut: navy tiles close on a diagonal (mirrored on alternate cuts),
+  the pattern morphs square → cross → triangle in accent + cream, fully covered at the cut; throws if the window
+  exceeds 0.8 s.
+- **`REEL.slam`** — two accent panels snap shut on the word and split open onto the title.
+- **`REEL.streaks` / `REEL.rings`** — light-speed burst and staggered ripple rings out of a point, u 0 → 1.
+- **`REEL.blob`** — glossy liquid core: smooth-union metaballs, orthographic raymarch, fresnel + two speculars, accent
+  colour; balls in stage px so droplets launch from any element. Third sanctioned WebGL owner in `lint_scene.py`.
+- **`REEL.marquee`, `REEL.smear`, `REEL.decode`, `REEL.hud`** — outline marquee rows, vertical motion trails for
+  rising glyphs, decode-on labels, and a film HUD (corner brackets with per-corner alpha, chapter index, timecode).
+- Proof: `node lib/reel.js --selftest` 13/13; `lint_scene.py` 0 errors on the demo + lib; two 2-worker renders of the
+  14 s demo framemd5-identical (0 / 420). `/new-film` copies `reel.js` with the other libs.
+
 ## 5.1.0 — Frames first, then motion (Wave 1)
 - Studio server guard: Host allow-list on every request, per-session token + Origin check on `/tap` and `/qa`, POST → 405 (same discipline as the review pack server); selftest cases added.
 

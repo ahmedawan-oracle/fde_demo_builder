@@ -1,0 +1,133 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>reel demo — the showreel motion layer on a 14 s clock (fictional Acme)</title>
+<!--
+  scenes_reel_demo.html — a stand-alone example of lib/reel.js (REEL), every device on one 14 s clock.
+    0.0 … 4.3   REEL.voxel + REEL.view  "the usual way": 91 day-cubes rise week by week on an iso camera; a coral crest
+                                        ripples out at 1.9 ("quarter-long"); 3.8 → 4.3 the camera un-tilts and the heights
+                                        fall, so the field lands exactly on the flat DOM grid, which then shatters
+    4.9         REEL.slam               two accent panels snap shut and split open onto "28 DAYS."
+    4.9 … 7.6   REEL.marquee ×2         outline rows drift in opposite directions behind the title; REEL.streaks burst
+    7.6         REEL.stinger            pixel-matrix cut (square → cross → triangle), the cut happens fully covered
+    7.9 … 11.2  REEL.blob               the liquid core: five artifact chips fly in and merge into it as droplets
+    11.2        REEL.stinger            second cut, mirrored sweep
+    11.6 … 14   REEL.rings + streaks    "Acme." with an accent full stop; REEL.smear trails on the rising letters
+    throughout  REEL.hud                corner brackets, chapter index with decode-on labels, running timecode
+  No timing file: in a real film every time below is a wt(phase, word) from lib/timeline.js. Scene contract as
+  film.example.html (?render, __seek/__step/__total, body.pre). No GSAP needed: REEL is plain pure functions of t.
+  Everything here is fictional ("Acme", synthetic numbers). The mandatory FDE Demo Builder credit is stamped by
+  build_film.py on the final video, not drawn here.
+-->
+<style>
+@font-face{font-family:'Arial';src:local('Arial')}
+@font-face{font-family:'Consolas';src:local('Consolas')}
+html,body{margin:0;background:#082A34;overflow:hidden;width:1280px;height:720px;font-family:Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body.pre #stage{visibility:hidden}
+#stage{position:absolute;inset:0;overflow:hidden;background:radial-gradient(ellipse 90% 80% at 50% 40%,#0F3A46 0%,#082A34 60%,#051C24 100%)}
+.g{position:absolute;inset:0}
+canvas.full{position:absolute;left:0;top:0;width:1280px;height:720px}
+.cell{position:absolute;width:40px;height:40px;box-sizing:border-box;border:1.5px solid rgba(129,169,171,.30);border-radius:3px;background:rgba(129,169,171,.26);transform-origin:20px 20px}
+.eb{position:absolute;font:700 13px/1 Consolas,monospace;letter-spacing:.28em;text-transform:uppercase;color:#E56B5E}
+.h1{position:absolute;left:0;width:1280px;text-align:center;font:800 120px/1 Arial;letter-spacing:-.02em;color:#E9F3F9;white-space:nowrap}
+.h2{position:absolute;left:0;width:1280px;text-align:center;font:800 64px/1 Arial;color:#E9F3F9;white-space:nowrap}
+.mq{position:absolute;left:0;white-space:nowrap;font:800 96px/1 Arial;color:transparent;-webkit-text-stroke:1.4px rgba(129,169,171,.34)}
+.chip{position:absolute;left:0;top:0;font:600 13px/1 Consolas,monospace;color:#E9F3F9;background:rgba(5,22,28,.94);border:1.5px solid #E56B5E;border-radius:3px;padding:5px 8px;white-space:nowrap}
+.card{position:absolute;left:470px;top:470px;width:340px;padding:14px 18px;box-sizing:border-box;background:rgba(5,22,28,.86);border:2px solid #E56B5E;border-radius:4px}
+.card i{display:block;font:700 11px/1 Consolas,monospace;font-style:normal;letter-spacing:.25em;color:#E56B5E;text-transform:uppercase}
+.card b{display:block;font:800 22px/1.2 Arial;color:#E9F3F9;margin-top:6px}
+.ch{display:inline-block;white-space:pre}
+</style></head><body class="pre"><div id="stage"></div>
+<script src="lib/reel.js"></script>
+<script>
+const RENDER = /[?&]render/.test(location.search), END = 14;
+const $ = s => document.querySelector(s), R = REEL.rmp, E = REEL.ease, L = (a, b, u) => a + (b - a) * u;
+const el = (tag, cls, parent, text, css) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (css) e.style.cssText = css; parent.appendChild(e); return e; };
+const op = (e, v) => { e.style.opacity = Math.max(0, Math.min(1, v)).toFixed(3); };
+const hs = (i, k) => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+const canvas = (parent, z) => { const c = el('canvas', 'full', parent, null, 'z-index:' + (z || 0)); c.width = 1920; c.height = 1080; return c; };
+/* clock (a real film: wt(phase, word)) */
+const TQ = 1.9, TFLAT = 4.3, TS = 4.32, TSLAM = 4.9, CUT1 = 7.6, CUT2 = 11.2, TBRAND = 11.6;
+const CH = [[0, 'The usual way'], [4.3, 'Twenty-eight days'], [7.6, 'One core'], [11.2, 'Acme']];
+const G = { x: 332, y: 176, cols: 13, rows: 7, pitch: 48, size: 40 };
+const st = $('#stage');
+/* act A: voxel quarter + flat DOM grid for the shatter */
+const gA = el('div', 'g', st);
+const vx = canvas(gA);
+el('div', 'eb', gA, 'The usual way', 'left:332px;top:122px');
+const day = el('div', 'eb', gA, '', 'left:648px;width:300px;text-align:right;top:122px;color:#81A9AB');
+const cells = []; for (let c = 0; c < 13; c++) for (let r = 0; r < 7; r++) cells.push({ c, r, i: c * 7 + r, cx: G.x + c * 48 + 20, cy: G.y + r * 48 + 20, e: el('div', 'cell', gA, null, 'left:' + (G.x + c * 48) + 'px;top:' + (G.y + r * 48) + 'px') });
+const lab = el('div', 'h2', gA, '13 WEEKS · PROOF OF CONCEPT', 'top:546px;font-size:28px');
+/* act B: slam + title + marquee + streaks */
+const gB = el('div', 'g', st);
+const mq = [70, 528].map(y => el('div', 'mq', gB, 'FAST TRACK ✦ BRIEFING → PRODUCTION ✦ TWENTY-EIGHT DAYS ✦ '.repeat(4), 'top:' + y + 'px'));
+const skB = canvas(gB);
+const tB = el('div', 'h1', gB, null, 'top:262px'); el('span', '', tB, '28 DAYS'); el('span', '', tB, '.', 'color:#D9533F');
+const slam = REEL.slam(st, { z: 40 });
+/* act C: liquid core + artifact chips */
+const gC = el('div', 'g', st);
+el('div', 'eb', gC, 'Move the artifacts', 'left:64px;top:54px');
+const core = REEL.blob(gC, 300, 200, 680, 460);
+const SRC = [[150, 226, 'SQL views'], [395, 204, 'notebooks'], [640, 196, 'pipelines'], [885, 204, 'mappings'], [1130, 226, 'jobs']];
+const chips = SRC.map(s => el('div', 'chip', gC, s[2]));
+const card = el('div', 'card', gC); el('i', '', card, 'One governed target'); const cardB = el('b', '', card, 'Acme Data Platform · 0');
+/* act D: brand lock-up */
+const gD = el('div', 'g', st);
+const skD = canvas(gD);
+const brand = el('div', 'h1', gD, null, 'top:250px;height:130px;overflow:hidden');
+const letters = 'Acme.'.split('').map((c, i, a) => el('span', 'ch', brand, c, i === a.length - 1 ? 'color:#D9533F' : ''));
+const sub = el('div', 'h2', gD, 'Briefing to production in four weeks', 'top:410px;font-size:26px;color:#81A9AB;font-weight:600');
+/* overlay: HUD + stingers */
+const hud = canvas(st, 50);
+
+function frame(t) {
+  /* ---- A ---- */
+  const V = REEL.view(t, { grid: G, flatAt: TFLAT });
+  op(gA, 1 - R(t, TS + .7, TS + 1.0));
+  REEL.voxel(vx, t, { grid: G, view: V,
+    height: (c, tt) => { const ft = .3 + c.i * .038, fu = E.out3(R(tt, ft, ft + .25)), tn = R(tt, TQ + c.c * .045, TQ + c.c * .045 + .35) * fu;
+      const d = Math.hypot(c.cx - 640, c.cy - 340), crest = tt > TQ ? Math.exp(-Math.pow((d - (tt - TQ) * 520) / 70, 2)) * (1 - R(tt, TQ + 1.1, TQ + 1.6)) : 0;
+      return 12 * E.back(R(tt, ft, ft + .38)) + 26 * tn + 34 * crest + 6 * Math.sin(tt * 2.6 - (c.c * .55 + c.r * .35)) * R(tt, 1.2, 2.4) * fu; },
+    color: (c, tt) => { const ft = .3 + c.i * .038, fu = E.out3(R(tt, ft, ft + .25)), tn = R(tt, TQ + c.c * .045, TQ + c.c * .045 + .35) * fu;
+      const d = Math.hypot(c.cx - 640, c.cy - 340), crest = tt > TQ ? Math.exp(-Math.pow((d - (tt - TQ) * 520) / 70, 2)) * (1 - R(tt, TQ + 1.1, TQ + 1.6)) : 0;
+      return { top: [Math.round(L(129, 236, tn)), Math.round(L(169, 222, tn)), Math.round(L(171, 195, tn)), .26 + .1 * tn], side: [L(38, 150, tn), L(70, 138, tn), L(78, 118, tn)], line: [129, 169, 171, .3], crest, a: fu }; } });
+  vx.style.opacity = (1 - R(t, TS - .06, TS)).toFixed(3);
+  day.textContent = 'DAY ' + Math.max(0, Math.min(91, Math.floor((t - .3) / .038) + 1)) + ' / 91';
+  op(lab, R(t, TQ, TQ + .35));
+  cells.forEach(c => { if (t < TS) { op(c.e, R(t, TS - .1, TS - .04)); c.e.style.transform = 'none'; return; }
+    const dx = c.cx - 640, dy = c.cy - 340, s0 = Math.hypot(dx, dy) / 420 * .14, u = E.out3(R(t, TS + s0, TS + s0 + 1)), an = Math.atan2(dy, dx) + (hs(c.i, 1) - .5) * .9, dd = (360 + 560 * hs(c.i, 2)) * u;
+    op(c.e, 1 - R(u, .35, 1)); c.e.style.transform = 'translate(' + (Math.cos(an) * dd).toFixed(1) + 'px,' + (Math.sin(an) * dd).toFixed(1) + 'px) rotate(' + ((hs(c.i, 3) - .5) * 600 * u).toFixed(1) + 'deg)'; });
+  /* ---- B ---- */
+  op(gB, R(t, TSLAM - .02, TSLAM) * (1 - R(t, CUT1 - .05, CUT1)));
+  slam.draw(t, TSLAM);
+  mq.forEach((m, k) => { op(m, R(t, TSLAM, TSLAM + .5)); REEL.marquee(m, t, TSLAM, { dir: k ? -1 : 1 }); });
+  { const c = skB.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 1920, 1080); REEL.streaks(c, 640, 322, R(t, TSLAM + .02, TSLAM + 1.05), { n: 130, seed: 9 }); }
+  const tu = E.out3(R(t, TSLAM, TSLAM + .5)); tB.style.transform = 'scale(' + (1.25 - .25 * tu).toFixed(3) + ')';
+  /* ---- C ---- */
+  op(gC, R(t, CUT1 - .02, CUT1) * (1 - R(t, CUT2 - .05, CUT2)));
+  const land = SRC.map((s, i) => CUT1 + .6 + i * .45 + .9);
+  let nl = 0, fl = 0; land.forEach(la => { if (t >= la) { nl++; fl = Math.max(fl, Math.exp(-(t - la) * 4.5)); } });
+  const coreU = E.out3(R(t, CUT1 + .2, CUT1 + .7)), bx = 640, by = 470, r0 = (64 + 4 * nl + 8 * fl) * coreU;
+  const balls = [[bx, by, r0], [bx + Math.cos(t * 1.3) * r0 * .78, by + Math.sin(t * 1.7) * r0 * .34, r0 * .42, .2], [bx + Math.cos(t * .9 + 2) * r0 * .82, by + Math.sin(t * 1.2 + 1) * r0 * .3, r0 * .36, -.2]];
+  chips.forEach((ch, i) => { const s = SRC[i], t0 = land[i] - .9, u = R(t, t0, land[i]);
+    if (u <= 0) { op(ch, R(t, CUT1 + .1 + i * .08, CUT1 + .3 + i * .08)); ch.style.transform = 'translate(' + s[0] + 'px,' + (s[1] + 40) + 'px) translate(-50%,-50%)'; return; }
+    if (u >= 1) { op(ch, 0); } else { const f = E.io3(u), x = L(s[0], bx, f), y = L(s[1] + 40, by - 30, f) - 60 * Math.sin(Math.PI * f) * .3;
+      op(ch, Math.min(1, (1 - u) * 9)); ch.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + L(1, .55, E.in3(u)).toFixed(3) + ')'; }
+    const du = R(t, land[i] - .12, land[i] + .45); if (du > 0 && du < 1 && balls.length < 8) { const f = E.io3(du); balls.push([L(bx, bx, f), L(by - 34, by, f), 15 * (1 - .55 * f)]); } });
+  core.draw(t >= CUT1 - .1 && t < CUT2 ? balls : [], t, 1);
+  cardB.textContent = 'Acme Data Platform · ' + nl;
+  /* ---- D ---- */
+  op(gD, R(t, CUT2 - .02, CUT2));
+  { const c = skD.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 1920, 1080);
+    REEL.rings(c, 640, 315, R(t, TBRAND - .05, TBRAND + 1.7), { n: 11, r1: 720, a: .85 }); REEL.streaks(c, 640, 315, R(t, TBRAND + .02, TBRAND + 1.15), { n: 120, seed: 33 }); }
+  letters.forEach((ch, i) => { const a = TBRAND + .15 + i * .07, u = E.out3(R(t, a, a + .4)); ch.style.transform = 'translateY(' + (130 * (1 - u)).toFixed(1) + 'px)'; ch.style.textShadow = REEL.smear(u > 0 ? 1 - u : 0); });
+  op(sub, R(t, TBRAND + .9, TBRAND + 1.3));
+  /* ---- overlay ---- */
+  REEL.hud(hud, t, { chapters: CH, end: END });
+  REEL.stinger(hud, t, { cuts: [CUT1, CUT2], clear: false });
+}
+let t0 = null;
+function loop(now) { if (t0 === null) t0 = now; const t = (now - t0) / 1000; frame(t); if (!RENDER && t > END + 1) t0 = now; requestAnimationFrame(loop); }
+window.__total = END;
+window.__seek = t => { document.body.classList.remove('pre'); frame(t); frame(t); };
+window.__step = t => frame(t);
+if (!RENDER) { const q = new URLSearchParams(location.search); if (q.has('t')) window.__seek(parseFloat(q.get('t'))); else requestAnimationFrame(loop); }
+</script></body></html>

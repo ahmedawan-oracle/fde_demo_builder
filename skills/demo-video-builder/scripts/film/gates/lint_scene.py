@@ -45,7 +45,7 @@ because v2 b-roll scenes use CSS transitions and __start() by design):
                 a promoted layer rasters at a scale the compositor picks from how its transform changed, so a cold seek
                 and a stepped run, or two renders under load, raster its glyphs differently)
                 sync_push_in_frame (E: window.__sync.push inside frame()/__seek/__step — sync points are published at mount)
-  gl            gl_context_owner (E: getContext('webgl'|'webgl2') anywhere but lib/shaders.js and lib/title3d.js — one GL
+  gl            gl_context_owner (E: getContext('webgl'|'webgl2') anywhere but lib/shaders.js, lib/title3d.js and lib/reel.js (REEL.blob) — one GL
                 owner per scene; GL.create/texture/transition/pass/chain/cutTransition/drive/show/cardCanvas/textCard/
                 snapshotToCanvas/frameIndex are the sanctioned calls and need no allowance)
                 finishing_on_footage (E: GL.pass / GL.chain whose texture is the footage lane — #clipImg, #pageImg,
@@ -88,7 +88,7 @@ PLACEHOLDER_HOSTS = ('placehold.co', 'placeholder.com', 'placekitten.com', 'pics
 SEV_ORDER = {'error': 0, 'warning': 1, 'info': 2}
 
 # the GL layer: one owner per scene, finishing never on the footage lane, transitions over footage <= 0.5 s
-GL_OWNERS = ('lib/shaders.js', 'lib/title3d.js')
+GL_OWNERS = ('lib/shaders.js', 'lib/title3d.js', 'lib/reel.js')
 GL_ALLOWED_CALLS = ('GL.create', 'GL.texture', 'GL.transition', 'GL.pass', 'GL.chain', 'GL.cutTransition', 'GL.drive', 'GL.show',
                     'GL.cardCanvas', 'GL.textCard', 'GL.snapshotToCanvas', 'GL.frameIndex', 'GL.destroy')
 GL_DUR = {'chromaSplit': 0.35, 'warpDissolve': 0.5, 'lightLeak': 0.7, 'flashWhite': 0.28, 'iris': 0.6, 'slitScan': 0.45, 'crossWarp': 0.5}
@@ -413,11 +413,11 @@ class Linter(object):
 
     def _gl_rules(self, nostr, code, rel, L, frame_body):
         """GL layer + mount-time publishing rules. `nostr` keeps string contents (selectors, effect names), `code` does not."""
-        owner = rel.replace('\\', '/').endswith(GL_OWNERS) or os.path.basename(rel) in ('shaders.js', 'title3d.js')
+        owner = rel.replace('\\', '/').endswith(GL_OWNERS) or os.path.basename(rel) in ('shaders.js', 'title3d.js', 'reel.js')
         if not owner:
             for m in re.finditer(r'getContext\s*\(\s*[\'"](webgl2?|experimental-webgl)[\'"]', nostr):
-                self.add('gl_context_owner', 'error', rel, L(m.start()), 'a %s context outside lib/shaders.js / lib/title3d.js' % m.group(1),
-                         'one GL owner per scene: draw through GL.* (lib/shaders.js) or T3D.* (lib/title3d.js); hand three.js output to GL.texture as a canvas')
+                self.add('gl_context_owner', 'error', rel, L(m.start()), 'a %s context outside lib/shaders.js / lib/title3d.js / lib/reel.js' % m.group(1),
+                         'one GL owner per scene: draw through GL.* (lib/shaders.js), T3D.* (lib/title3d.js) or REEL.blob (lib/reel.js); hand three.js output to GL.texture as a canvas')
         for m in re.finditer(r'\bGL\s*\.\s*(pass|chain)\s*\(', nostr):
             args = _call_args(nostr, m.end())
             if FOOTAGE_RE.search(args):

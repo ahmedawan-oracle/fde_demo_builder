@@ -78,6 +78,11 @@ and renders byte-identically on software GL. Read [picture-doctrine](skills/demo
   that glides, frosted panels (≤ 2, never on the caption lane).
 - **Reveals** — the first real screen arrives as a floating plate or compiles out of 6000 particles and hands
   over to the footage lane on one frame; the last one lifts away for the close.
+- **Showreel motion** — for pitch films and team reels: a grid of days that rises as an iso voxel field and lands
+  exactly back on the flat grid; a split-panel slam onto the title; pixel-matrix wipes at the big cuts; light-speed
+  bursts and ripple rings on the payoff word; a glossy liquid core that drinks every arriving artifact (WebGL, works
+  on software GL); outline marquees, smear trails and a film HUD with chapters and timecode. Pure functions of t,
+  byte-identical renders, recreated layer only.
 - **Recording-native** — pointer and keys captured while you record (clap-aligned) or recovered from an old
   tape as a proposal; a camera that pushes to where the work happens and lands on a spoken word; a redrawn
   cursor with click rings; a keystroke pill; idle / spinner / typing / scroll detection that proposes the cuts.
