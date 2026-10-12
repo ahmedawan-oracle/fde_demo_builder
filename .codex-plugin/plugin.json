@@ -1,0 +1,22 @@
+{
+  "name": "fde-demo-builder",
+  "version": "5.2.1",
+  "description": "Build polished narrated demo films from real screen recordings with deterministic rendering, privacy scrubbing, sound design, transitions, and production QA.",
+  "author": {
+    "name": "Ahmed Awan - Forward Deployed Engineering Team",
+    "email": "232676096+ahmedawan-oracle@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "keywords": ["demo", "video", "ffmpeg", "voiceover", "screen-recording", "fde"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "FDE Demo Builder",
+    "shortDescription": "Build polished narrated demos from screen recordings.",
+    "longDescription": "A production demo-video workflow for story development, real-pixel footage, animation, privacy scrubbing, voiceover, sound design, deterministic rendering, mastering, and QA.",
+    "developerName": "Forward Deployed Engineering Team",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write", "Interactive"],
+    "defaultPrompt": ["Build a demo video.", "Scaffold a production film.", "QA this demo video."],
+    "brandColor": "#0EA5E9"
+  }
+}

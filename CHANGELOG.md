@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.2.1 — Claude Code and Codex parity
+
+- Added a Codex plugin manifest over the same `demo-video-builder` skill used by Claude Code.
+- Made the existing command and QA-agent Markdown the shared runtime specifications, with explicit placeholder handling.
+- Preserved Claude slash commands and isolated QA-agent behavior while adding Codex natural-language routing.
+
 ## 5.2.0 — Showreel motion (`lib/reel.js`)
 
 For pitch films and team reels: the grammar of a motion-design reel on the recreated layer, as nine pure functions

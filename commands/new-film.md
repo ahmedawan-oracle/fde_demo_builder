@@ -3,6 +3,12 @@ description: Scaffold a v5 production film — real-pixel footage (original full
 argument-hint: <project-name> [--template booth-trailer|customer-story|feature-walkthrough]
 ---
 
+This file is the shared Claude Code and Codex scaffolding specification. A Claude slash-command invocation
+expands its project-name and plugin-root placeholders. When this file is read directly in either client and a
+placeholder remains literal, take the project name and optional template from the user's request, then resolve
+the plugin root as `dirname(<absolute SKILL.md path>)/../..`. Execute the same brief, scaffold, build, and QA
+requirements in either client.
+
 Scaffold a new v5 film project named **$1** from the FDE Demo Builder templates. `--template <name>` picks one of
 the three film templates in step 2 without asking (30–45 s booth trailer · 90–150 s customer story · 60–120 s
 feature walkthrough); without it, offer them and let the author choose or keep the Acme defaults.
@@ -105,7 +111,7 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      → **Approve start / Approve end** per beat (END first — it is the frame the next cut lands on; once `approvals.json`
      exists the build refuses while an END is unapproved) → resolve comments → `python tools/review_pack.py --lock --by "Name"`;
      the `review lock` gate passes after that.
-   - **Whole-cut notes.** After the `demo-qa-reviewer` agent's whole-cut pass: `python tools/review_notes.py import notes.txt`
+   - **Whole-cut notes.** After the shared reviewer's whole-cut pass: `python tools/review_notes.py import notes.txt`
      (each note snaps to the nearest cut / seam / shot boundary) → `decide N --accept|--reject --why "…"` → the table lands in
      `DELIVERY.md` with the share pack. Rejections are kept on purpose.
    - **Sound proof.** After the build `cue sync` (sfx_gate) locates every SFX in the finished audio; `python audio/cues_check.py
@@ -116,7 +122,7 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      the camera: `node scenes/lib/stage.js --reflow 9:16 --track out/camera_curves.json --total <END> --out
      out/stage_reflow_9x16.json` then `--preset vertical_9x16 --reflow out/stage_reflow_9x16.json`.
    - After the first reviewed build: `python gates/snapshot.py scenes/film.html --update` freezes golden frames. Then run
-     the `demo-qa-reviewer` agent on the final MP4.
+     the shared reviewer specification on the final MP4 (Claude agent; Codex separate no-edit pass).
    - Render notes: the default is software GL (frames identical on every machine; a DOM shot in 80 ms); `RENDER_GL=hardware`
      is for previews only — never mix the two in one film. Scenes with a 3D title render with `"workers": 1`.
 

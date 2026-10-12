@@ -1,6 +1,6 @@
 # FDE Demo Builder
 
-A Claude Code plugin that turns a **raw screen recording** of a product/customer demo into a
+A Claude Code and Codex plugin that turns a **raw screen recording** of a product/customer demo into a
 **polished, voice‑narrated, privacy‑scrubbed demo video** — with an optional animated opener/outro —
 **entirely from scripts**. No video editor, no manual timeline. Edit a config, run one command, get a
 shareable `.mp4`.
@@ -37,23 +37,31 @@ Chrome's software GL path by default so the frames are identical on every machin
 for previews. Windows 10/11 fonts (Georgia, Cambria, Segoe UI, Arial, Consolas, Bahnschrift) are the skins'
 local pairings; `tools/fonts_localize.py --local` keeps a public project free of font files.
 
-## Install (as a Claude Code plugin)
+## Install
 
-Clone this repo, then add it as a local plugin (or via your team marketplace):
+Clone this repo, then add it as a local plugin or through your team marketplace:
 
 ```bash
 git clone https://github.com/ahmedawan-oracle/fde_demo_builder.git
-# In Claude Code:  /plugin  → add local plugin → point at the cloned folder
+claude plugin install fde-demo-builder --marketplace ahmedawan-oracle/fde_demo_builder
 ```
 
-Once installed you get:
+For Codex, a team or personal marketplace can point its plugin entry at the clone. After that marketplace
+is configured, install with `codex plugin add fde-demo-builder@<marketplace-name>`.
 
-- **Skill** `demo-video-builder` — the full methodology; Claude follows it when you ask to build a demo video.
+Both manifests expose the same `demo-video-builder` skill and the same Markdown workflow specifications.
+Claude additionally presents native slash-command and agent UI; Codex reaches those same files through the skill:
+
+- **Skill** `demo-video-builder` — the full methodology in Claude Code and Codex.
 - **Command** `/fde-demo-builder:new-demo <name>` — scaffolds a new demo project (scripts + starter config).
 - **Command** `/fde-demo-builder:new-broll <name>` — *(v2)* scaffolds a story-rebuild project (b-roll scenes + multi-voice).
 - **Command** `/fde-demo-builder:new-film <name>` — *(v3–v5)* scaffolds a production film: BRIEF → look pass →
   STORYBOARD → sketch → lock → build → QA → studio taps → review pack → export.
 - **Agent** `demo-qa-reviewer` — adversarially QAs a finished video (privacy, footage honesty, chart truth, VO‑sync, credit).
+
+In Codex, ask to scaffold a v1 demo, v2 story rebuild, or v5 production film, or ask it to QA a finished video.
+The skill reads `commands/new-demo.md`, `commands/new-broll.md`, `commands/new-film.md`, or
+`agents/demo-qa-reviewer.md` respectively, so the behavior and acceptance criteria stay aligned with Claude.
 
 > **Mandatory credit.** Every video built with this plugin ends with a small centred footer line on the end
 > screen — *Crafted with FDE Demo Builder · by Ahmed Awan*. The build scripts stamp and verify it
@@ -99,6 +107,7 @@ and renders byte-identically on software GL. Read [picture-doctrine](skills/demo
 
 ```
 /fde-demo-builder:new-film acme-monday
+# Codex equivalent: ask "Scaffold a production film named acme-monday with FDE Demo Builder."
 cd acme-monday && npm i puppeteer gsap three d3-delaunay && pip install -r requirements.txt
 python make_sample_recording.py && python gen_vo_multivoice.py && python extract_clips.py
 node export_timeline.js scenes/timing_film_data.js scenes/shots.js && python build_film.py && python qa_film.py
@@ -215,6 +224,7 @@ Method docs: [motion-doctrine](skills/demo-video-builder/references/motion-doctr
 
 ```
 /fde-demo-builder:new-demo acme-widgets
+# Codex equivalent: ask "Scaffold a v1 demo named acme-widgets with FDE Demo Builder."
 ```
 
 Then, in the new `acme-widgets/` folder:
@@ -224,7 +234,7 @@ Then, in the new `acme-widgets/` folder:
    `masks`/`zoom`/`freeze`.
 3. `python gen_vo.py`   → narration MP3s in `vo/`
 4. `python build.py`    → `out/demo.mp4`
-5. Ask Claude to run the `demo-qa-reviewer` agent on `out/demo.mp4`; fix anything it flags; rebuild.
+5. Ask Claude to invoke `demo-qa-reviewer`, or ask Codex for a separate no-edit QA pass using the shared reviewer specification; fix anything it flags and rebuild.
 
 See [skills/demo-video-builder/SKILL.md](skills/demo-video-builder/SKILL.md) and the
 [references/](skills/demo-video-builder/references/) for the detailed method and hard‑won ffmpeg lessons.

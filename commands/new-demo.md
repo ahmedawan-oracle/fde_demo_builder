@@ -3,6 +3,11 @@ description: Scaffold a new demo-video project (scripts + starter config) from t
 argument-hint: <project-name>
 ---
 
+This file is the shared Claude Code and Codex scaffolding specification. A Claude slash-command invocation
+expands its project-name and plugin-root placeholders. When this file is read directly in either client and a
+placeholder remains literal, take the project name from the user's request and resolve the plugin root as
+`dirname(<absolute SKILL.md path>)/../..`. Execute the same steps and constraints in either client.
+
 Scaffold a new demo-video project named **$1** using the FDE Demo Builder templates.
 
 Do the following:
@@ -23,7 +28,8 @@ Do the following:
    - Edit `$1/demo_config.py`: list the beats — `spans` (kept ranges, cutting lags), `vo` (narration),
      and any `masks` / `zoom` / `freeze`. (Optional: render an opener with `node render_bookend.js`.)
    - Run `python gen_vo.py` then `python build.py`; the result is `$1/out/demo.mp4`.
-   - Then run the `demo-qa-reviewer` agent on `$1/out/demo.mp4`, fix anything it flags, and rebuild.
+   - Then run the shared reviewer specification on `$1/out/demo.mp4`: Claude invokes the `demo-qa-reviewer`
+     agent; Codex uses a separate no-edit review pass. Fix anything it flags and rebuild.
 
 Also remind them that **the FDE Demo Builder credit ("Crafted with FDE Demo Builder · by Ahmed Awan") is
 mandatory** on the end screen — `build.py` stamps and verifies it; never remove or alter it. And the two hard rules: **no customer names anywhere in the video**, and **scrub every

@@ -3,6 +3,11 @@ description: Scaffold a v2 "story rebuild" demo project — animated b-roll acts
 argument-hint: <project-name>
 ---
 
+This file is the shared Claude Code and Codex scaffolding specification. A Claude slash-command invocation
+expands its project-name and plugin-root placeholders. When this file is read directly in either client and a
+placeholder remains literal, take the project name from the user's request and resolve the plugin root as
+`dirname(<absolute SKILL.md path>)/../..`. Execute the same steps and constraints in either client.
+
 Scaffold a new story-rebuild demo project named **$1** using the FDE Demo Builder v2 templates.
 
 Do the following:
@@ -28,7 +33,8 @@ Do the following:
      and loop blocks verbatim, replace the layers). QA with `node shot.js scenes/opener.html 12 qa/op12.png`,
      render with `node render_scene.js scenes/opener.html vo_opener.mp3 out/seg1_opener.mp4`.
    - Cut + mux the recording segments and run `bash assemble.sh` (recipes are in the file).
-   - Finish with the `demo-qa-reviewer` agent on the final MP4.
+   - Finish with the shared reviewer specification: Claude invokes the `demo-qa-reviewer` agent; Codex uses a
+     separate no-edit review pass on the final MP4.
    - Method details: `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/references/broll-scenes.md`
      and `references/multi-voice.md`.
 

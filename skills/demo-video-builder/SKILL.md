@@ -1,6 +1,6 @@
 ---
 name: demo-video-builder
-description: Use when building a polished, voice-narrated demo video from a screen recording — turning a raw capture of a product demo into a shareable MP4 with cut lag, scrubbed privacy leaks, synced VO, optional animated opener/outro. v2 adds cinematic "story rebuilds" — animated b-roll acts word-synced to a multi-voice cast. v3 adds production films — real-pixel footage (original full screen → zoom, real scrolls and typing), the narration as the clock, deterministic frame-by-frame render, linear-loudness mastering, QA gates. v4 adds production craft — velocity-matched seams, camera kit, caption lane, carved audio, lint + determinism canary, storyboard review, blocks, media ledger, honest finishing. v5 is the picture layer — GSAP timelines on the clock, kinetic type, WebGL transitions, 3D titles, story blocks, light / depth / annotation / glass, reveals, a redrawn cursor and camera from telemetry, idle detection, an OCR leak gate, karaoke captions, staging and vertical reflow, brand kits + ten skins, a live studio, a review pack, synthesized SFX — on software GL, with the mandatory FDE Demo Builder end-screen credit. Triggers on "build a demo video", "narrate this recording", "make a demo from this screen capture", "cut the thinking lags and add voiceover", "add a wow animated opener", "multi voice demo", "b-roll story animation", "booth trailer", "make this look like a product film", "kinetic titles", "karaoke captions", "vertical cut".
+description: Build or QA polished, voice-narrated demo videos from screen recordings. Use for "build a demo video", "narrate this recording", "make a demo from this screen capture", cutting thinking lag, privacy scrubbing, synced voiceover, "add a wow animated opener", "multi voice demo", "b-roll story animation", booth trailers, production films, kinetic titles, karaoke captions, sound design, transitions, and vertical cuts. Covers real-pixel footage, narration-clock timing, deterministic rendering, mastering, review gates, and the mandatory FDE Demo Builder credit. Also use to scaffold v1 demos, v2 story rebuilds, or v5 production films.
 ---
 
 # Demo Video Builder
@@ -41,16 +41,19 @@ on the final file. → `references/credit-footer.md`
 (chrome bar, time-gated masks). → `references/privacy-scrubbing.md` 4. **Frame & zoom** (native scale, gentle
 push-in). → `references/framing-and-zoom.md` 5. **Voiceover** per beat with edge-tts. 6. **Assemble & sync**
 (`build.py` time-fits footage to VO). → `references/voiceover-and-sync.md` 7. **QA** → `references/qa-checklist.md`.
-Scaffold with `/fde-demo-builder:new-demo <name>`; `gen_vo.py` → `build.py` → `out/demo.mp4`. Pitfalls:
-`references/ffmpeg-gotchas.md`.
+For v1 scaffolding, Claude invokes `/fde-demo-builder:new-demo <name>`. Codex reads and follows
+[`commands/new-demo.md`](../../commands/new-demo.md) from a natural-language request. If a client reads the file
+directly, its preamble defines placeholder substitution.
+Then `gen_vo.py` → `build.py` → `out/demo.mp4`. Pitfalls: `references/ffmpeg-gotchas.md`.
 
 ## v2 — Story rebuilds: b-roll acts + a multi-voice cast
 
 Review the source (frames + transcript) → write `vo_script.py` (2–3 voices, SCENES + PLACED beats) →
 `gen_vo_multivoice.py` (word timestamps) → clock-driven b-roll scenes (`frame(t)`, `wt()`, flakes, Ken Burns)
 QA'd with `shot.js` and rendered with `render_scene.js` → `assemble.sh`. B-roll is clearly stylised and
-fictional; recorded segments are real screens only. → `references/broll-scenes.md`, `references/multi-voice.md`,
-`/fde-demo-builder:new-broll`.
+fictional; recorded segments are real screens only. → `references/broll-scenes.md`, `references/multi-voice.md`.
+For v2 scaffolding, Claude invokes `/fde-demo-builder:new-broll`. Codex reads and follows
+[`commands/new-broll.md`](../../commands/new-broll.md); the same Markdown defines the workflow.
 
 ## v3 — Production films: real pixels on the narration clock
 
@@ -176,5 +179,11 @@ the export. Everything the scene loads is a local file.
 sketch sheet (`--mobile` for a phone) → lock → cut list (`cutlist.py` for the footage windows) → build → QA (incl.
 `hold_gate`, `look_gate`) → `snapshot.py --pairs` → `pair_gate` → review pack (approve END frames, comments) → whole-cut notes decided
 (`review_notes.py`) → sign-off → `takes.py prune --after-lock` → export (`--closure hardcut` for a loop; DELIVERY.md carries
-the notes table). A change after that is a `cutlist.py bump` and an `identity_gate` pass. `/fde-demo-builder:new-film <name>` walks it; the fictional
-Acme sample (`make_sample_recording.py`) runs end to end and passes every gate.
+the notes table). A change after that is a `cutlist.py bump` and an `identity_gate` pass. For production-film
+scaffolding, Claude invokes `/fde-demo-builder:new-film <name>`. Codex reads and follows
+[`commands/new-film.md`](../../commands/new-film.md); the same Markdown defines the workflow. The fictional Acme sample
+(`make_sample_recording.py`) runs end to end and passes every gate.
+
+For a final adversarial review, Claude must invoke the isolated `demo-qa-reviewer` agent. Codex reads
+[`agents/demo-qa-reviewer.md`](../../agents/demo-qa-reviewer.md) in a separate no-edit review pass (use an
+independent subagent when available). Both return the same evidence-backed ranked verdict contract.
