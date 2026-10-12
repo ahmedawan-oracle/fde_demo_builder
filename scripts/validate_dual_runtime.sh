@@ -22,6 +22,7 @@ grep -q '../../commands/new-demo\.md' skills/demo-video-builder/SKILL.md
 grep -q '../../commands/new-broll\.md' skills/demo-video-builder/SKILL.md
 grep -q '../../commands/new-film\.md' skills/demo-video-builder/SKILL.md
 grep -q '../../agents/demo-qa-reviewer\.md' skills/demo-video-builder/SKILL.md
+grep -q 'inside `\$0/`' commands/new-film.md
 
 test -f commands/new-demo.md
 test -f commands/new-broll.md
@@ -34,5 +35,6 @@ python3 -c 'import pathlib; line=next(x for x in pathlib.Path("skills/demo-video
 python3 -m json.tool .claude-plugin/plugin.json >/dev/null
 python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 python3 -m json.tool .claude-plugin/marketplace.json >/dev/null
+python3 scripts/validate_film_templates.py
 
 echo "Claude/Codex manifests and shared Markdown routes are aligned at $claude_version."

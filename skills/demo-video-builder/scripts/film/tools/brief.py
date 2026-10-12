@@ -29,7 +29,7 @@ CREDIT = 'Crafted with FDE Demo Builder · by Ahmed Awan'           # mandatory,
 
 DESTINATIONS = {
     #  name       aspects accepted (first = derived default)   length_s range   receipt
-    'booth':    (['1920x1080'], (60, 180), 'a booth loop is glanced at from 2–4 m: biggest type, 1–3 min'),
+    'booth':    (['1920x1080'], (30, 180), 'a booth film is glanced at from 2–4 m: biggest type, 30 s trailer to 3 min loop'),
     'session':  (['1920x1080'], (120, 240), 'a session clip plays once on a projector with a speaker beside it'),
     'linkedin': (['1080x1080', '1920x1080'], (30, 90), 'a feed fights for its first second and plays small: ×1.5 type, under 90 s'),
     'youtube':  (['1920x1080'], (60, 300), 'full-screen viewing; a longer read is fine'),
@@ -55,8 +55,8 @@ QUESTIONS = [
     ('audience', 'Who watches? Recommended: the role that asks the on-screen question, plus whoever approves their tooling.'),
     ('destination', 'Where does it play — booth | session | linkedin | youtube | vertical | internal? Recommended: booth — it '
                     'sets the loudest room and the smallest readable type; aspect is derived from it.'),
-    ('length_s', 'Target length in seconds? Recommended: 120–180 for a booth film — 6–10 beats at ~2.5 words/s, product '
-                 'beats 8–20 s each; the usable screen time in the recording is the ceiling.'),
+    ('length_s', 'Target length in seconds? Recommended: 30–45 for a booth trailer or 120–180 for a booth loop — '
+                 'product beats need 8–20 s each, and usable screen time in the recording is the ceiling.'),
     ('angle', 'Which telling? Recommended: run the pitch round (five tellings, three lines each) and pick by reaction; '
               'record the two rejected alternatives under ## Notes.'),
     ('narration', 'Narration mode — verbatim (the recording\'s own words) | restructured (rewritten around the message)? '

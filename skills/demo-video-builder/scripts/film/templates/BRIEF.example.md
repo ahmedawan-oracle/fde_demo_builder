@@ -8,7 +8,7 @@ message: "A question that took a day now takes a minute, on data the team alread
 audience: "operations leads and the analysts who serve them"
 destination: booth                      # booth | session | linkedin | youtube | internal
 aspect: 1920x1080                       # derived from destination (booth/session/youtube → 1920x1080; linkedin → 1080x1080 or 1920x1080; vertical → 1080x1920)
-length_s: 150                           # target; 6–10 beats at ~2.5 words/s; booth loops run 60–180 s
+length_s: 150                           # target; booth trailers run 30–45 s, booth loops 60–180 s
 angle: "one Monday, two people, one question"
 narration: restructured                 # verbatim (the recording's own words) | restructured (rewritten around the message)
 voices: 4                               # narrator + persona voices + the product's own voice

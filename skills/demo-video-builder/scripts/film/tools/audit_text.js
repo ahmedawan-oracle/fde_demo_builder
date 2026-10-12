@@ -36,9 +36,9 @@
 const puppeteer = require('puppeteer');
 const path = require('path'); const fs = require('fs');
 
-function chromePath() {
+async function chromePath() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  try { const p = puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) {}
+  try { const p = await puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) {}
   return ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
           '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(fs.existsSync);
 }
@@ -184,7 +184,7 @@ function suggest(fg, bg, need) {           // nudge L toward the passing side, s
 }
 
 (async () => {
-  const b = await puppeteer.launch({ headless: 'new', executablePath: chromePath(), args: FLAGS });
+  const b = await puppeteer.launch({ headless: 'new', executablePath: await chromePath(), args: FLAGS });
   const p = await b.newPage();
   const pageErrors = [];
   p.on('pageerror', e => pageErrors.push(e.message));

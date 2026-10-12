@@ -9,18 +9,14 @@ placeholder remains literal, take the project name and optional template from th
 the plugin root as `dirname(<absolute SKILL.md path>)/../..`. Execute the same brief, scaffold, build, and QA
 requirements in either client.
 
-Scaffold a new v5 film project named **$1** from the FDE Demo Builder templates. `--template <name>` picks one of
+Scaffold a new v5 film project named **$0** from the FDE Demo Builder templates. `--template <name>` picks one of
 the three film templates in step 2 without asking (30–45 s booth trailer · 90–150 s customer story · 60–120 s
 feature walkthrough); without it, offer them and let the author choose or keep the Acme defaults.
 
-0. **Brief first.** If the request names no angle, run the pitch round: five tellings (the subject's world · the emotion ·
-   the audience met or broken · the anti-pattern inverted · an unusual format), three lines each, at least two unlikely
-   ones, all five before a recommendation; mixing is an answer; one round. Then fill `BRIEF.md` one field per message,
-   recommended option first with its receipt; skip fields the request already answered (inference is not an answer);
-   hand off with STATED and INFERRED as two groups. Add the `## Never on screen` list (customer and colleague names the
-   recording may show — the leak gate fuzzy-matches them). `python tools/brief.py BRIEF.md` must print BRIEF OK.
-1. Create `$1/` in the current working directory (stop politely if it already exists; never overwrite).
-2. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/film/` copy into `$1/`:
+0. **Choose the scaffold.** Resolve the requested template (or the Acme default) before creating files. Template duration,
+   destination and angle are recommendations until the requester confirms them; inference is not an answer.
+1. Create `$0/` in the current working directory (stop politely if it already exists; never overwrite).
+2. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/film/` copy into `$0/`:
    - `vo_script.example.py` → `vo_script.py` · `clips.example.json` → `clips.json` · `film.example.json` → `film.json`
      · `qa.example.json` → `qa.json` · `claims.example.json` → `claims.json`
    - `templates/seams.example.json` → `seams.json` · `templates/captions.example.json` → `scenes/captions.json`
@@ -28,9 +24,12 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      · `templates/BRIEF.example.md` → `BRIEF.md` · `templates/STORYBOARD.example.md` → `STORYBOARD.md`
      · `templates/design.example.md` → `design.md` (do NOT copy `templates/media.example.jsonl`; `ledger.py adopt` writes the real one)
    - the film templates in `templates/films/` (booth-trailer · customer-story · feature-walkthrough; each has a README,
-     a STORYBOARD skeleton, `seams.json`, `captions.json`, `film.json`, `skin.json`): copy the one named by `--template`
+     STORYBOARD skeleton, `seams.json`, `captions.json`, `clips.json`, `film.json`, `skin.json`): copy the one named by `--template`
      (or chosen when offered) over the defaults — `STORYBOARD.md`, `seams.json`, `scenes/captions.json`, `film.json`,
-     and its `skin.json` as `film.json → "skin"`.
+     `clips.json`, and its `skin.json` as `film.json → "skin"`. Never overwrite a completed `BRIEF.md`.
+     These are planning skeletons, not alternate rendered Acme scenes: after selecting one, rewrite `vo_script.py` and
+     `scenes/shots.js` so their phases and visual ids implement that template before rendering. Do not call a selected
+     template render-ready merely because its brief and storyboard validate.
    - `extract_clips.py`, `render_frames.js`, `build_film.py`, `qa_film.py`, `check_cues.js`, `export_timeline.js`,
      `make_sample_recording.py` (unchanged)
    - `film.example.html` → `scenes/film.html` · `shots.example.js` → `scenes/shots.js`
@@ -38,24 +37,36 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      motion, typo, shaders, title3d, blocks2, light, depth, annotate, glass, reveals, stage, charts, compare, cursor, hud, reel)
    - `gates/*.py` → `gates/` · `tools/*` → `tools/` · `audio/*.py` → `audio/` · `skins/` → `skins/` · `studio/` → `studio/`
 3. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/` copy `gen_vo_multivoice.py`, `credit.py` and
-   `requirements.txt` into `$1/`.
-4. Create empty `$1/broll/`, `$1/vo/`, `$1/out/`, `$1/music/`, `$1/golden/`; run `python tools/ledger.py adopt` inside `$1/`.
+   `requirements.txt` into `$0/`.
+3a. **Brief before any pixel.** The copied `BRIEF.md` is a fictional example, not a record of requester answers. If the
+   request names no angle, run the pitch round: five tellings (the subject's world · the emotion · the audience met or
+   broken · the anti-pattern inverted · an unusual format), three lines each, at least two unlikely ones, all five before
+   a recommendation; mixing is an answer; one round. Fill the brief one field per message, recommended option first with
+   its receipt; skip fields the request already answered. Reconcile the chosen template's suggested duration and
+   destination here, put defaults only under `## Inferred`, and hand off with STATED and INFERRED as two groups. Add the
+   `## Never on screen` list (customer and colleague names the recording may show — the leak gate fuzzy-matches them).
+   `python tools/brief.py BRIEF.md` must print BRIEF OK; do not proceed while required answers remain open.
+4. Create empty `$0/broll/`, `$0/vo/`, `$0/out/`, `$0/music/`, `$0/golden/`; run `python tools/ledger.py adopt` inside
+   `$0/`. After `python tools/brief.py BRIEF.md` prints BRIEF OK, run `python tools/brief.py BRIEF.md --seed-qa --write`.
    Append to the project `.gitignore`: `events.jsonl`, `*.events.jsonl`, `leaks.json`, `out/`, `audio/sfx/`.
-5. Install once, in the project or a parent folder: `npm i puppeteer gsap three d3-delaunay` (scenes load the three
-   libraries from `node_modules` by relative path — never from a CDN) and `pip install -r requirements.txt`
+5. Install once **inside `$0/`**: `npm install --prefix . puppeteer gsap three d3-delaunay` (the explicit prefix prevents
+   npm from silently hoisting into a parent workspace; scenes load the three libraries from
+   `$0/node_modules` by relative browser paths — a parent/hoisted install is not visible to `file:` scenes; never use a CDN)
+   and `pip install -r requirements.txt`
    (edge-tts, Pillow, numpy and **scipy** — scipy is a hard dependency of the SFX synth, the voice chain, cursor
    tracking, idle detection and the leak gate's avatar detector; + `pip install winocr` on Windows — the preferred
    OCR engine there, 60–100× faster than the bundled model at equal recall — or `rapidocr-onnxruntime
    opencv-python-headless onnxruntime` elsewhere, to enable OCR in the leak gate). `python tools/doctor.py` confirms
    ffmpeg, node, Chrome, the Python modules (scipy included), the node libs and the GL path.
 6. Print the flow as the next steps:
-   - **Try it first:** `python make_sample_recording.py` creates a fictional `recording.mp4`; the example config renders
-     it end to end and passes every gate.
+   - **Try it first (untemplated Acme default):** `python make_sample_recording.py` creates a fictional `recording.mp4`;
+     the default example config renders it end to end and passes every gate. A selected `--template` replaces the plan,
+     seam and clip vocabulary; finish its `vo_script.py` and `scenes/shots.js` adaptation before trying to render it.
    - **References.** `python tools/ref_study.py log --title "…" --shot "len|camera|lighting|cut" …` for the films this one
      resembles (craft only — logos, taglines and copy are refused), `measure <film.mp4>` for the ones you have, `report` →
      `REFERENCES.md` with the shot-length, rhythm, luma and contrast bands the storyboard is written against.
    - **Look pass.** Pick a skin from `skins/README.md` (open its sheet in `skins/sheets/`) or extract one from a logo:
-     `python tools/brand_kit.py extract --logo assets/logo.png --bg dark --mood corporate --name $1 --out skin_tokens.json
+     `python tools/brand_kit.py extract --logo assets/logo.png --bg dark --mood corporate --name $0 --out skin_tokens.json
      --sheet out/style_sheet.png`. Look at the sheet; set `film.json → "skin"`; `python tools/brand_kit.py check <skin>`;
      `python tools/skin_apply.py skins/<name>.json` writes `scenes/skin_data.js` (and the head-fade plate for light skins).
      If the look is wrong, change the skin, not the scene.

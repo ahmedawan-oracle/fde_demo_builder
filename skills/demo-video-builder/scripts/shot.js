@@ -12,9 +12,9 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 
-function chromePath() {
+async function chromePath() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  try { const p = puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) { /* fall through */ }
+  try { const p = await puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) { /* fall through */ }
   return ['C:/Program Files/Google/Chrome/Application/chrome.exe',
           'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
           '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -30,7 +30,7 @@ const T = parseFloat(TSTR);
 
 (async () => {
   const b = await puppeteer.launch({
-    headless: 'new', executablePath: chromePath(),
+    headless: 'new', executablePath: await chromePath(),
     args: ['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1.5', '--window-size=1280,760'],
   });
   const p = await b.newPage();

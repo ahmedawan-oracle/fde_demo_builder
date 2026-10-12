@@ -30,8 +30,8 @@ Scarcity rules the gates enforce: one accent seam, one slam, one hero per beat, 
 
 ## Using it
 
-`/new-film <name> --template booth-trailer` copies these six files over the base scaffold (`STORYBOARD.md`, `seams.json`,
-`scenes/captions.json`, `film.json`; `skin.json` is read and its path written into `film.json` `"skin"`). Then:
+`/new-film <name> --template booth-trailer` applies `STORYBOARD.md`, `seams.json`, `scenes/captions.json`, `clips.json`
+and `film.json` over the base scaffold; `skin.json` supplies the path written into `film.json` `"skin"`. Then:
 
 ```
 python tools/skin_apply.py skins/ember.json          # scenes/skin_data.js + design.md tokens (build_film.py repeats this)
@@ -43,3 +43,5 @@ Studio taps for the review pack go to `out/taps/NN_<label>.jpg` (beat number, th
 writes them there and `tools/review_pack.py` reads them in that order.
 
 Everything in this template is fictional (Acme, synthetic data). The credit line is never reworded or moved.
+This is a planning skeleton. Adapt `vo_script.py` and `scenes/shots.js` to its phase and visual vocabulary before
+rendering; the untemplated scaffold is the out-of-box Acme render sample.

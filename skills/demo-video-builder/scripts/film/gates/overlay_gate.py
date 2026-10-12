@@ -297,9 +297,9 @@ MEASURE_JS = r"""
    node measure_overlays.js <scene.html> <times.json> <out/overlays.json> <capbg dir> */
 const puppeteer = require('puppeteer'); const fs = require('fs'); const path = require('path');
 const [SCENE, TIMES, OUT, CAPDIR] = process.argv.slice(2);
-function chromePath() {
+async function chromePath() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  try { const p = puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) {}
+  try { const p = await puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) {}
   return ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 }
 const T = JSON.parse(fs.readFileSync(TIMES, 'utf8'));
@@ -339,7 +339,7 @@ const MEASURE = (W, H) => {
   // same Chrome switches as render_frames.js: file: images may feed GL textures (a GL.cutTransition window otherwise throws a
   // cross-origin texImage2D error and the whole measure pass dies) and the software rasteriser keeps the boxes machine-independent
   const glArgs = process.env.RENDER_GL === 'hardware' ? [] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu'];
-  const b = await puppeteer.launch({ headless: 'new', executablePath: chromePath(),
+  const b = await puppeteer.launch({ headless: 'new', executablePath: await chromePath(),
     args: ['--no-sandbox', '--hide-scrollbars', '--font-render-hinting=none', '--disable-lcd-text', '--allow-file-access-from-files'].concat(glArgs) });
   const res = { W: T.W, H: T.H, samples: [], windows: [], crops: {}, hasCap: false };
   const p = await open(b, '');
