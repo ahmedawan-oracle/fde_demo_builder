@@ -2,7 +2,9 @@
 """captions_ass.py — word-timed sidecar captions (.ass with per-word \\k tags, plus .srt / .vtt) from the lane's own groups.
 
     python tools/captions_ass.py out/caption_groups.json [--out out/<film>.ass] [--srt out/<film>.srt] [--vtt out/<film>.vtt]
-                                 [--overrides captions_overrides.json] [--font "Segoe UI"] [--burn] [--json]
+                                 [--overrides captions_overrides.json] [--translations captions_<lang>.json]
+                                 [--emit-translation-template captions_<lang>.json]
+                                 [--font "Segoe UI"] [--fonts-dir assets/fonts] [--burn] [--json]
     python tools/captions_ass.py scenes/timing_<name>_data.js --config scenes/captions.json ...     # groups via node lib/captions.js
     python tools/captions_ass.py vo/<name>_words.json --config scenes/captions.json ...             # sibling <name>_phases.json
     python tools/captions_ass.py --selftest
@@ -48,13 +50,23 @@ its index) or "<phase>:<i>" with the phase-local index i from the timing data. t
 every output (.ass, .srt, .vtt — lines are rebuilt keeping the lane's words-per-line); t0/t1 move the word and, if
 needed, widen the cue window around it. A key that matches no word, or t1 ≤ t0, is a finding (exit 1).
 
+TRANSLATIONS (captions_<lang>.json):
+    {"_language":"ar", "_direction":"rtl", "_font":"Noto Sans Arabic", "_max_chars":42,
+     "groups":{"cg-0":{"source":"Original source text","lines":["translated line one","translated line two"]}}}
+Every shown caption group must be present and its `source` must still equal the current source cue. Unknown or stale
+groups are findings. `--emit-translation-template` writes this mapping from the current groups before translation.
+The cue windows remain tied to the narration clock, while the translated
+text is emitted as a whole cue rather than false word-level karaoke. libass performs Unicode shaping and bidi; use a
+local font that covers the script. `--font` overrides `_font`. Translations and word-level overrides are mutually
+exclusive because they have different review contracts.
+
 --burn prints the ffmpeg video-filter for export.py / a v1-v2 timeline:  ass='C\\:/…/film.ass'  (filtergraph
 escaping: ':' → '\\:', backslashes → '/'). JSON out (--json): {ass, srt, vtt, cues, words, styles, burn_filter, findings}.
 
 Exit codes: 0 ok · 1 findings (bad override, overlapping or zero-length cue, blank selftest frame) · 2 usage.
 Stdlib + (selftest only) numpy; ffmpeg with libass on PATH for --selftest and the burn.
 """
-import json, os, re, shutil, subprocess, sys, tempfile
+import hashlib, json, os, re, shutil, subprocess, sys, tempfile, unicodedata
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -228,8 +240,100 @@ def apply_overrides(doc, overrides, lead=LEAD_DEFAULT):
     return findings
 
 
+def norm_text(value):
+    return ' '.join(str(value or '').split())
+
+
+def display_width(value):
+    """Conservative terminal-cell proxy used to catch obviously overlong translated lines."""
+    width = 0
+    for char in str(value):
+        if unicodedata.combining(char) or unicodedata.category(char) in ('Cf', 'Mn', 'Me'):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in ('W', 'F') else 1
+    return width
+
+
+def translation_template(doc, language='', direction='auto', font='', include_all=False):
+    groups = {}
+    for gi, g in enumerate(doc.get('groups') or []):
+        if g.get('fate') == 'drop' and not include_all:
+            continue
+        gid = g.get('id', 'cg-%d' % gi)
+        source = norm_text(g.get('text') or ' '.join(g.get('lines') or []))
+        groups[gid] = {'source': source, 'source_sha256': hashlib.sha256(source.encode('utf-8')).hexdigest(), 'lines': []}
+    return {'_language': language, '_direction': direction, '_font': font, '_max_chars': 42, 'groups': groups}
+
+
+def apply_translations(doc, translations, include_all=False):
+    """Replace shown group text without changing cue timing; return findings."""
+    findings = []
+    if not isinstance(translations, dict):
+        return ['translations: root must be an object']
+    entries = translations.get('groups', translations)
+    if not isinstance(entries, dict):
+        return ['translations: "groups" must be an object keyed by caption group id']
+    current_ids = set()
+    try:
+        max_chars = int(translations.get('_max_chars', 42))
+        if max_chars < 10:
+            raise ValueError
+    except (TypeError, ValueError):
+        findings.append('translations: _max_chars must be an integer of at least 10')
+        max_chars = 42
+    direction = str(translations.get('_direction', 'auto')).lower()
+    if direction not in ('auto', 'ltr', 'rtl'):
+        findings.append('translations: _direction must be auto, ltr or rtl')
+        direction = 'auto'
+    for gi, g in enumerate(doc.get('groups') or []):
+        if g.get('fate') == 'drop' and not include_all:
+            continue
+        gid = g.get('id', 'cg-%d' % gi)
+        current_ids.add(gid)
+        if gid not in entries:
+            findings.append('translations: missing shown group "%s"' % gid)
+            continue
+        value = entries[gid]
+        if not isinstance(value, dict):
+            findings.append('translations: group "%s" must contain source and lines' % gid)
+            continue
+        source = norm_text(g.get('text') or ' '.join(g.get('lines') or []))
+        declared = norm_text(value.get('source'))
+        source_hash = hashlib.sha256(source.encode('utf-8')).hexdigest()
+        if not declared or declared != source or (value.get('source_sha256') and value.get('source_sha256') != source_hash):
+            findings.append('translations: group "%s" source is stale; regenerate the template' % gid)
+            continue
+        value = value.get('lines', value.get('text'))
+        lines = value if isinstance(value, list) else str(value or '').splitlines()
+        lines = [str(line).strip() for line in lines if str(line).strip()]
+        if not lines:
+            findings.append('translations: group "%s" is blank' % gid)
+            continue
+        if len(lines) > 2:
+            findings.append('translations: group "%s" has %d lines; maximum is 2' % (gid, len(lines)))
+            continue
+        wide = [display_width(line) for line in lines]
+        if any(width > max_chars for width in wide):
+            findings.append('translations: group "%s" line width %s exceeds _max_chars %d' % (gid, ','.join(map(str, wide)), max_chars))
+            continue
+        shown = [('\u2067' + line + '\u2069') if direction == 'rtl' else line for line in lines]
+        g['lines'] = shown
+        g['text'] = ' '.join(lines)
+        g['_localized'] = True
+    extra = sorted(str(key) for key in entries if not str(key).startswith('_') and key not in current_ids)
+    for gid in extra:
+        findings.append('translations: unknown group "%s"; regenerate the template' % gid)
+    doc['_translation'] = {
+        'language': translations.get('_language', ''),
+        'direction': direction,
+        'font': translations.get('_font', ''),
+        'max_chars': max_chars,
+    }
+    return findings
+
+
 # ------------------------------------------------------------------------------------------------ the .ass writer
-def style_rows(styles_used, font_override=None):
+def style_rows(styles_used, font_override=None, encoding=1):
     rows = []
     for name in sorted(styles_used):
         tok = STYLE_TOKENS.get(name, STYLE_TOKENS['anchor'])
@@ -244,9 +348,9 @@ def style_rows(styles_used, font_override=None):
         fate_embed = name == 'keynote'
         align = 5 if fate_embed else (1 if tok['align'] == 'left' else 2)
         spacing = round(tok['tracking'] * size, 2)
-        rows.append('Style: %s,%s,%d,%s,%s,%s,%s,%d,0,0,0,100,100,%.2f,0,%d,%.1f,%.1f,%d,%d,%d,%d,1' % (
+        rows.append('Style: %s,%s,%d,%s,%s,%s,%s,%d,0,0,0,100,100,%.2f,0,%d,%.1f,%.1f,%d,%d,%d,%d,%d' % (
             name, fontname, size, primary, secondary, ocol, bcol, bold, spacing, border, outline, shadow, align,
-            int(PLAY_W * 0.10), int(PLAY_W * 0.10), int(tok['bottom'])))
+            int(PLAY_W * 0.10), int(PLAY_W * 0.10), int(tok['bottom']), encoding))
     return rows
 
 
@@ -295,6 +399,11 @@ def karaoke_text(g, tok):
     return ''.join(parts)
 
 
+def localized_text(g):
+    """Cue-level localized text; no invented word-to-word timing."""
+    return esc_text('\n'.join(g.get('lines') or [g.get('text', '')]))
+
+
 def build_ass(doc, title='captions', font_override=None, include_all=False):
     """→ (ass_text, findings, meta). Cues are monotonic and clamped to the film end, like the SRT twin."""
     findings, events, styles_used = [], [], set()
@@ -303,7 +412,7 @@ def build_ass(doc, title='captions', font_override=None, include_all=False):
     for g in doc['groups']:
         if g.get('fate') == 'drop' and not include_all:
             continue
-        if not g.get('words'):
+        if not g.get('words') and not g.get('_localized'):
             continue
         a, b = max(float(g['in']), prev_end), min(float(g['out']), end_film)
         if b - a < 0.05:
@@ -316,7 +425,8 @@ def build_ass(doc, title='captions', font_override=None, include_all=False):
         tok = STYLE_TOKENS[name]
         g2 = dict(g); g2['in'] = a
         fade = '{\\fad(120,150)}' if not tok.get('waterfall') else '{\\fad(0,180)}'
-        events.append('Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s' % (ass_time(a), ass_time(b), name, fade, karaoke_text(g2, tok)))
+        cue_text = localized_text(g2) if g2.get('_localized') else karaoke_text(g2, tok)
+        events.append('Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s' % (ass_time(a), ass_time(b), name, fade, cue_text))
         prev_end = b
     head = ['[Script Info]', '; written by tools/captions_ass.py from the lane\'s caption groups - edit captions.json / captions_overrides.json, not this file',
             'Title: %s' % title, 'ScriptType: v4.00+', 'PlayResX: %d' % PLAY_W, 'PlayResY: %d' % PLAY_H, 'WrapStyle: 2',
@@ -324,14 +434,18 @@ def build_ass(doc, title='captions', font_override=None, include_all=False):
             '[V4+ Styles]',
             'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, '
             'ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding']
-    head += style_rows(styles_used or {'anchor'}, font_override)
+    encoding = -1 if (doc.get('_translation') or {}).get('direction') == 'rtl' else 1
+    head += style_rows(styles_used or {'anchor'}, font_override, encoding)
     head += ['', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text']
     text = '\n'.join(head + events) + '\n'
     return text, findings, {'cues': len(events), 'styles': sorted(styles_used), 'k_tags': text.count('\\k')}
 
 
-def burn_filter(ass_path):
+def burn_filter(ass_path, fonts_dir=None):
     p = os.path.abspath(ass_path).replace('\\', '/').replace(':', '\\:')
+    if fonts_dir:
+        f = os.path.abspath(fonts_dir).replace('\\', '/').replace(':', '\\:')
+        return "ass=filename='%s':fontsdir='%s'" % (p, f)
     return "ass='%s'" % p
 
 
@@ -379,6 +493,22 @@ def selftest():
     assert doc2['groups'][0]['words'][1]['display'] == 'areas' and doc2['groups'][0]['lines'][0] == 'Which areas', doc2['groups'][0]['lines']
     assert doc2['groups'][2]['words'][2]['start'] == 1.95 and doc2['groups'][2]['out'] >= 2.02, doc2['groups'][2]
     assert len(fnd) == 2 and 'matches no word' in fnd[0] and 't1' in fnd[1], fnd
+    # Localized captions keep the narration cue windows but do not fake per-word timing.
+    doc3 = _synthetic_doc()
+    tmpl = translation_template(doc3, 'ar', 'rtl', 'Noto Sans Arabic')
+    tr = dict(tmpl); tr['groups'] = dict(tmpl['groups'])
+    tr['groups']['cg-0']['lines'] = ['سؤال تجريبي']
+    tr['groups']['cg-1']['lines'] = ['بيانات خيالية']
+    tr['groups']['cg-2']['lines'] = ['إجابة واحدة', 'موثوقة']
+    f3 = apply_translations(doc3, tr)
+    ass3, af3, m3 = build_ass(doc3, 'localized', tr['_font'])
+    assert not f3 and not af3 and m3['cues'] == 3, (f3, af3, m3)
+    assert 'سؤال تجريبي' in ass3 and '\\N' in ass3 and '\\k' not in ass3, ass3[-600:]
+    assert 'Encoding' in ass3 and 'Noto Sans Arabic' in ass3 and ass3.count(',-1\n') >= 1, ass3[:1200]
+    stale = translation_template(_synthetic_doc(), 'ar', 'rtl', 'Noto Sans Arabic')
+    stale['groups']['cg-0']['source'] = 'old narration'
+    assert any('source is stale' in x for x in apply_translations(_synthetic_doc(), stale)), stale
+    assert "fontsdir='" in burn_filter('/tmp/a.ass', '/tmp/fonts')
     # files + the SRT/VTT twin
     ass_path = os.path.join(d, 'self.ass'); open(ass_path, 'w', encoding='utf-8-sig').write(ass1)
     if SRT:
@@ -423,16 +553,42 @@ def main(argv):
     except SystemExit as e:
         print(str(e)); return 2
     findings = []
+    emit_path = opt('--emit-translation-template')
+    if emit_path:
+        template = translation_template(doc, opt('--language', ''), opt('--direction', 'auto'), opt('--font', ''), include_all='--all' in argv)
+        os.makedirs(os.path.dirname(os.path.abspath(emit_path)), exist_ok=True)
+        with open(emit_path, 'w', encoding='utf-8') as fh:
+            json.dump(template, fh, indent=2, ensure_ascii=False); fh.write('\n')
+        print('captions_ass: translation template -> ' + emit_path)
+        return 0
     ov_path = opt('--overrides')
+    tr_path = opt('--translations')
+    translation = None
+    if ov_path and tr_path:
+        print('captions_ass: --overrides and --translations are mutually exclusive'); return 2
     if ov_path:
         if not os.path.exists(ov_path):
             print('captions_ass: no such overrides file ' + ov_path); return 2
         findings += apply_overrides(doc, json.load(open(ov_path, encoding='utf-8')))
+    if tr_path:
+        if not os.path.exists(tr_path):
+            print('captions_ass: no such translations file ' + tr_path); return 2
+        try:
+            translation = json.load(open(tr_path, encoding='utf-8'))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            print('captions_ass: invalid translations file: %s' % exc); return 2
+        findings += apply_translations(doc, translation, include_all='--all' in argv)
     stem = os.path.splitext(opt('--out') or (os.path.splitext(src)[0] if src.lower().endswith('.json') else 'out/captions'))[0]
     ass_path = opt('--out') or stem + '.ass'
     title = os.path.basename(stem)
-    text, f2, meta = build_ass(doc, title, opt('--font'), include_all='--all' in argv)
+    font = opt('--font') or ((translation or {}).get('_font') if translation else None)
+    text, f2, meta = build_ass(doc, title, font, include_all='--all' in argv)
     findings += f2
+    if translation and findings:
+        for finding in findings:
+            print('  FINDING  ' + finding)
+        print('captions_ass: refusing to replace localized sidecars until every translation finding is fixed')
+        return 1
     os.makedirs(os.path.dirname(os.path.abspath(ass_path)), exist_ok=True)
     with open(ass_path, 'w', encoding='utf-8-sig') as fh:                      # BOM: libass and VLC read the UTF-8 for certain
         fh.write(text)
@@ -445,7 +601,9 @@ def main(argv):
         if vtt_path:
             SRT.write_vtt(cues, vtt_path)
     report = {'ass': ass_path.replace('\\', '/'), 'srt': srt_path, 'vtt': vtt_path, 'cues': meta['cues'], 'k_tags': meta['k_tags'], 'styles': meta['styles'],
-              'words': word_table(doc, include_all='--all' in argv), 'burn_filter': burn_filter(ass_path), 'findings': findings}
+              'translation': doc.get('_translation'),
+              'localized_groups': [{'id': g.get('id'), 'lines': g.get('lines')} for g in doc.get('groups', []) if g.get('_localized')],
+              'words': word_table(doc, include_all='--all' in argv), 'burn_filter': burn_filter(ass_path, opt('--fonts-dir')), 'findings': findings}
     if '--json' in argv:
         print(json.dumps(report, indent=1, ensure_ascii=False))
     else:

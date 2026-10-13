@@ -105,6 +105,11 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      word; a sync point that must land anyway carries `"force": true` (reported as `forced: true`, still counted by
      `sfx one impact`). Chapters: `"chapters": true` merges automatically for films under 60 s (`{"merge": "auto"}`;
      set `true`/`false` to override) — a 35 s trailer gets one chapter, not six.
+   - **Customer proof and localization.** For a prospect-specific story, follow `references/customer-proof-film.md`:
+     measure references for craft only, use the customer-story treatment, and map every setup claim to later product
+     proof. When localization is requested, emit and complete the source-locked caption template, set
+     `captions.translation` with `captions.burn:false`, and export `burn_ass`; keep the narration clock and product
+     footage unchanged.
    - `node check_cues.js scenes/timing_film_data.js scenes/shots.js scenes/film.html seams.json`
    - `node scenes/lib/camera.js --curves scenes/timing_film_data.js scenes/shots.js broll/clips.js` — fix every FAIL.
    - **Studio.** `python tools/studio.py` → http://127.0.0.1:8765 : scrub, frame-step, hot reload at the same t; **T** taps a

@@ -5,6 +5,8 @@
 - Added a Codex plugin manifest over the same `demo-video-builder` skill used by Claude Code.
 - Made the existing command and QA-agent Markdown the shared runtime specifications, with explicit placeholder handling.
 - Preserved Claude slash commands and isolated QA-agent behavior while adding Codex natural-language routing.
+- Added a shared customer-proof-film treatment and deterministic localized ASS/SRT/VTT captions, including RTL font,
+  provenance, timing, and review guidance.
 
 ## 5.2.0 — Showreel motion (`lib/reel.js`)
 

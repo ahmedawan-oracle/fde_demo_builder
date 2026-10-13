@@ -35,6 +35,8 @@
 film.json keys added in v5 (every one opt-in; a v4 film.json builds exactly as before):
     "skin": "skins/harbor.json", "skin_design": true, "skin_strict": false
     "captions": {..., "ass": true, "overrides": "captions_overrides.json"}
+    "captions": {..., "burn": false, "translation": "captions_ar.json", "fonts_dir": "assets/fonts"}
+    # use exports:["burn_ass"] for the localized master
     "chapters": true | {"merge": "auto"|true|false, "min": 10, "max_title": 40, "snap": 0.75}
     "sfx": {"auto": true, "sync": "sync.json", "db": -14, "guard": 0.15, "nudge": 0.12, "dir": "audio/sfx"}
     "fx": {"buses": {"voice": {"preset": "voice-booth"}, "bed": {"preset": "bed-under-voice"}, "sfx": {"preset": "sfx-tight"}}}
@@ -200,6 +202,25 @@ def plan():
     if have('export_timeline.js'):
         run(['node', os.path.join(HERE, 'export_timeline.js'), TIMING_DATA, SHOTS_JS], cwd=HERE)
     cap = C.get('captions') or {}
+    translation = cap.get('translation')
+    if translation:
+        if cap.get('burn') is not False:
+            raise SystemExit('REFUSING: localized captions require captions.burn=false; otherwise English and localized captions overlap')
+        if cap.get('overrides'):
+            raise SystemExit('REFUSING: captions.translation and captions.overrides are mutually exclusive')
+        if not cap.get('ass'):
+            raise SystemExit('REFUSING: captions.translation requires captions.ass=true')
+        if not have(translation):
+            raise SystemExit('REFUSING: captions.translation file is missing: %s' % translation)
+        fonts_dir = cap.get('fonts_dir')
+        if not fonts_dir or not os.path.isdir(os.path.join(HERE, fonts_dir)):
+            raise SystemExit('REFUSING: localized captions require captions.fonts_dir with local licensed font files')
+        font_files = [name for name in os.listdir(os.path.join(HERE, fonts_dir)) if name.lower().endswith(('.ttf', '.otf', '.ttc'))]
+        if not font_files:
+            raise SystemExit('REFUSING: captions.fonts_dir contains no .ttf, .otf or .ttc files')
+        for required in (cap.get('config'), os.path.join('scenes', 'lib', 'captions.js'), os.path.join('tools', 'captions_ass.py')):
+            if not required or not have(required):
+                raise SystemExit('REFUSING: localized captions require %s' % (required or 'captions.config'))
     if cap.get('config') and have(cap['config']) and have('scenes', 'lib', 'captions.js'):
         def captions_cmd(with_luma):
             cmd = ['node', os.path.join(HERE, 'scenes', 'lib', 'captions.js'), TIMING_DATA, os.path.join(HERE, cap['config']),
@@ -536,13 +557,20 @@ def captions():
         if cap.get('vtt'):
             cmd += ['--vtt', os.path.splitext(FILM)[0] + '.vtt']
         ov = cap.get('overrides')
+        translation = cap.get('translation')
         if ov and have(ov):
             cmd += ['--overrides', os.path.join(HERE, ov)]
+        if translation:
+            cmd += ['--translations', os.path.join(HERE, translation)]
         rc = subprocess.run(cmd, cwd=HERE).returncode
         if rc == 2:
             raise SystemExit('REFUSING: tools/captions_ass.py could not read out/caption_groups.json')
+        if rc and translation:
+            raise SystemExit('REFUSING: localized caption validation failed; no localized master was exported')
         if rc:
-            print('      WARN  captions_ass findings above (overrides) — the sidecars were still written')
+            print('      WARN  captions_ass findings above — the sidecars were still written')
+        if translation and (not os.path.exists(ass) or not os.path.exists(SRT)):
+            raise SystemExit('REFUSING: localized caption sidecars were not written')
         return
     if os.path.exists(gp) and have('tools', 'captions_srt.py'):
         cmd = [sys.executable, os.path.join(HERE, 'tools', 'captions_srt.py'), gp, SRT]

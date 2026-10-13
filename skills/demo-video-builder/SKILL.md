@@ -1,6 +1,6 @@
 ---
 name: demo-video-builder
-description: Build or QA polished, voice-narrated demo videos from screen recordings. Use for "build a demo video", "narrate this recording", "make a demo from this screen capture", cutting thinking lag, privacy scrubbing, synced voiceover, "add a wow animated opener", "multi voice demo", "b-roll story animation", booth trailers, production films, kinetic titles, karaoke captions, sound design, transitions, and vertical cuts. Covers real-pixel footage, narration-clock timing, deterministic rendering, mastering, review gates, and the mandatory FDE Demo Builder credit. Also use to scaffold v1 demos, v2 story rebuilds, or v5 production films.
+description: Build or QA polished, voice-narrated demo videos from screen recordings. Use for "build a demo video", "narrate this recording", "make a demo from this screen capture", cutting thinking lag, privacy scrubbing, synced voiceover, "add a wow animated opener", "multi voice demo", "b-roll story animation", customer proof films, localized subtitles, booth trailers, production films, kinetic titles, karaoke captions, sound design, transitions, and vertical cuts. Covers real-pixel footage, narration-clock timing, deterministic rendering, mastering, review gates, and the mandatory FDE Demo Builder credit. Also use to scaffold v1 demos, v2 story rebuilds, or v5 production films.
 ---
 
 # Demo Video Builder
@@ -64,6 +64,13 @@ it is spoken → `render_frames.js` (frame-by-frame, N workers, frame 0 = clock 
 bed, two-pass linear loudnorm to −16 LUFS, captions, **credit**) → `qa_film.py`. → `references/real-pixel-footage.md`,
 `deterministic-render.md`, `cinematic-grammar.md`, `honesty-audit.md`, `audio-mix.md`.
 
+### Customer proof treatment
+
+When the goal is a prospect-specific film, use the `customer-story` scaffold and
+[`references/customer-proof-film.md`](references/customer-proof-film.md): measure a supplied reference for craft,
+build a short customer-world and data-to-agent setup, then spend the majority of the film on connected real product
+proof. The same reference defines optional reviewed localized captions from the narration's existing cue windows.
+
 ## v4 — Production craft
 
 | Layer | Lib / tool | Gate | Reference |
@@ -99,7 +106,7 @@ d3-delaunay`), and never touches a product pixel. Gates are footnotes: the devic
 | A reel, not a deck: a grid of days that rises as iso cubes and lands back on the flat grid; two accent panels that slam shut and split onto the title; a pixel-matrix wipe at the big cuts; light-speed bursts and ripple rings on the payoff word; a glossy liquid core that drinks every arriving artifact; outline marquees, smear trails, a film HUD with chapters and timecode | `REEL.voxel` · `view` · `slam` · `stinger` · `streaks` · `rings` · `blob` · `marquee` · `smear` · `hud` · `decode` | `lib/reel.js` (no GSAP; `scenes_reel_demo.html`) | `showreel-motion.md` |
 | Charts whose every value is a claim; a before/after split, wipe or picture-in-picture where both halves are the recording's own pixels | `CHART.bars` · `line` · `kpiTiles` · `race` · `donut` ⁷ · `COMPARE.split` · `wipe` · `pip` | `lib/charts.js`, `lib/compare.js` | `story-blocks.md` |
 | The screen in a frame (wallpaper, padding, neutral title bar) and a vertical or square cut that follows the cursor like an operator | `STAGE.mount` · `stage.pose` · `STAGE.reflow` → `export.py --reflow` | `lib/stage.js` | `staging-and-reflow.md` |
-| The spoken word lighting up in the caption; a word waterfall on recreated lines; the same timing in the burn-in, the .srt/.vtt and an .ass with per-word tags; chapters that start on cuts | `karaoke` · `kinetic` styles · `captions_ass.py` · `chapters.py` ⁸ | `lib/captions.js`, `tools/` | `captions-karaoke-chapters.md` |
+| The spoken word lighting up in the caption; a word waterfall on recreated lines; reviewed localized cues; the same timing in the burn-in, the .srt/.vtt and an .ass; chapters that start on cuts | `karaoke` · `kinetic` styles · `captions_ass.py --translations` · `chapters.py` ⁸ | `lib/captions.js`, `tools/` | `captions-karaoke-chapters.md`, `customer-proof-film.md` |
 | Nothing private: every extracted frame OCR'd for e-mails, identifiers, URLs, tokens, phone numbers, denylisted names and account badges; a blur proposal with a measured radius | `leak_gate.py` · `mask_propose.py --verify --apply` ⁹ | `gates/`, `tools/` | `privacy-leak-gate.md` |
 | A look approved before the build: a logo → a contrast-checked skin + a six-frame style sheet; ten shipped skins with motion profiles and caption styles | `brand_kit.py extract · compose · check` · `skins/*.json` · `skin_apply.py` ¹⁰ | `tools/`, `skins/` | `brand-kits-and-skins.md` |
 | Any frame in under a second, hot reload at the same t, a 1920x1080 tap through the real renderer; one offline review page with honesty flags, per-beat comments and the storyboard sign-off | `studio.py` (T tap, Q lint) · `review_pack.py build · --serve · --lock` ¹¹ | `tools/`, `studio/` | `review-pack-and-studio.md` |

@@ -213,12 +213,18 @@ class Exporter:
 
     def _ass_filter(self):
         """The libass burn filter for the sidecar — tools/captions_ass.burn_filter when it is beside us, else the same escaping."""
+        fonts_dir = (self.cfg.get('captions') or {}).get('fonts_dir')
+        fonts_dir = os.path.join(self.project, fonts_dir) if fonts_dir else None
         try:
             if HERE not in sys.path: sys.path.insert(0, HERE)
             import captions_ass as CA
-            return CA.burn_filter(self.ass)
+            return CA.burn_filter(self.ass, fonts_dir)
         except ImportError:
-            return "ass='%s'" % os.path.abspath(self.ass).replace('\\', '/').replace(':', '\\:')
+            ass = os.path.abspath(self.ass).replace('\\', '/').replace(':', '\\:')
+            if fonts_dir:
+                fonts = os.path.abspath(fonts_dir).replace('\\', '/').replace(':', '\\:')
+                return "ass=filename='%s':fontsdir='%s'" % (ass, fonts)
+            return "ass='%s'" % ass
 
     def _reflow_graph(self, preset, W, H):
         """Per-frame crop that follows the camera, from lib/stage.js --reflow (out/stage_reflow_<fmt>.json): a sendcmd table drives

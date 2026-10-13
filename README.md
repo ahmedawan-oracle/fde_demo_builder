@@ -170,6 +170,9 @@ recording's own pixels, driven on the narration's clock:
   (`wt(phase, word)`), verified by `check_cues.js`.
 - **Deterministic render** — frame-by-frame headless Chrome, multi-worker, no dropped frames.
 - **Broadcast-grade audio** — music bed ducked under the voices, two-pass *linear* loudnorm to −16 LUFS.
+- **Customer proof treatment** — measure a supplied reference for craft, build a short customer-world and
+  architecture setup, then hand off to connected real product evidence; optional reviewed localized captions use
+  source-locked groups on the same cue windows without inventing word timing.
 - **QA gates** — cuts land, no blank plates, no freeze > 5 s, loudness, over-claims, identifier hygiene,
   every spoken figure traced to the screen (`claims.json`), captions, and the credit.
 - **Try it in one minute** — `make_sample_recording.py` generates a fictional "Acme Console" capture that

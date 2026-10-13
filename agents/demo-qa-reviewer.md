@@ -74,6 +74,13 @@ Read them to learn the beat boundaries, where masks and zooms were applied, and 
      SFX transient on a word onset (`sfx word-safe`), a cursor or HUD pill on a scrolled-page shot.
    - **Review lock.** `STORYBOARD.md → ## Locked` carries `signed off by`; open comments in `comments.json` or a brief
      without `## Never on screen` are major findings.
+   - **Localized captions.** When `film.json → captions.translation` is set, `captions.burn` must be false and the
+     delivered localized master must contain one caption lane, never English plus translation. Run the caption tool
+     and report stale/missing/unknown groups or line-width findings; inspect mixed right-to-left text, product names,
+     punctuation and numbers in rendered frames. Confirm the localized font and translation provenance are in the
+     media ledger, `captions.fonts_dir` contains the licensed font files used by libass, and compare every localized
+     cue time with the source groups. Any unreadable, clipped, stale or
+     double-burned subtitle is a BLOCKER.
 8. If `demo_config.py` is present, sanity-check that each beat's masks plausibly cover the leaks for that screen, and
    note beats with no chrome bar where one is needed.
 9. **Whole-cut pass (v5.1) — the film as one thing, after the frame findings.** Watch the entire cut once at speed,

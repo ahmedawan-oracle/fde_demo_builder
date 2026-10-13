@@ -67,6 +67,10 @@ python tools/captions_ass.py out/caption_groups.json --out out/film.ass --srt ou
 - `--burn` prints `ass='C\:/…/film.ass'` for the v1/v2 timeline or `export.py`. ffmpeg must be built with libass
   (`ffmpeg -filters | grep ass`). Selftest: writes the .ass twice (byte-identical), burns it onto a 2 s navy
   clip and asserts ≥ 300 lit pixels in the bottom 40 % at three times.
+- For reviewed localized captions, first use `--emit-translation-template`, then set `film.json → captions.translation`
+  with `captions.burn:false` and export `burn_ass`. The source-locked mapping retains the same cue windows and emits
+  whole translated cues rather than false word-level karaoke. See `customer-proof-film.md` for the schema, font,
+  bidi, provenance, and review contract.
 
 ## Chapters — `tools/chapters.py`
 
