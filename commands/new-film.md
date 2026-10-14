@@ -105,7 +105,7 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      word; a sync point that must land anyway carries `"force": true` (reported as `forced: true`, still counted by
      `sfx one impact`). Chapters: `"chapters": true` merges automatically for films under 60 s (`{"merge": "auto"}`;
      set `true`/`false` to override) — a 35 s trailer gets one chapter, not six.
-   - **Customer proof and localization.** For a prospect-specific story, follow `references/customer-proof-film.md`:
+   - **Customer/industry proof and localization.** For a prospect-specific or generic industry story, follow `references/customer-proof-film.md`:
      measure references for craft only, use the customer-story treatment, and map every setup claim to later product
      proof. When localization is requested, emit and complete the source-locked caption template, set
      `captions.translation` with `captions.burn:false`, and export `burn_ass`; keep the narration clock and product

@@ -32,10 +32,14 @@ in source packages regardless of the film preference. → `references/credit-foo
 - **One clock.** Narration word times drive every cut, move, caption and sound (`wt(phase, word)`); every
   visual is a pure function of `t`; two renders are byte-identical.
 - **Cast, do not announce.** Default to two or three warm, role-based presenters: narrator for the stakes and
-  turns, guide for product proof, and at most one short customer persona. A single undifferentiated TTS voice is a
+  turns, guide for product proof, and at most one short customer or industry-operator persona. A single undifferentiated TTS voice is a
   deliberate exception, not the production default. Edge TTS remains supported as a cloud provider; approved OCI Speech
   `TTS_2_NATURAL` is available through the same multi-voice generator. → `references/multi-voice.md`,
   `references/oci-speech.md`
+- **Warm energy, not rushing.** Audition engaged, conversational takes with purposeful emphasis and natural
+  pauses. Aim for 150-160 wpm when the brief allows; shorten lines rather than increasing loudness or forcing
+  speed to meet a beat. Reusing verified takes with modest tempo changes still requires retiming captions and
+  checking the final mixed speech, handoffs and intelligibility.
 - **Verify audible words.** OCI narration must pass actual-audio transcription before accepting a take. Plausible
   provider speech marks, valid codecs and correct levels can coexist with garbled synthesis. Check the final mixed
   speech against the script too; regenerate failed takes.
@@ -81,10 +85,12 @@ bed, two-pass linear loudnorm to −16 LUFS, captions, **credit**) → `qa_film.
 
 ### Customer proof treatment
 
-When the goal is a prospect-specific film, use the `customer-story` scaffold and
+For either a prospect-specific film or a generic industry use case, use the `customer-story` scaffold and
 [`references/customer-proof-film.md`](references/customer-proof-film.md): measure a supplied reference for craft,
-build a short customer-world and data-to-agent setup, then spend the majority of the film on connected real product
+build a short customer or industry-world and data-to-agent setup, then spend the majority of the film on connected real product
 proof. The same reference defines optional reviewed localized captions from the narration's existing cue windows.
+The template name is historical: no customer name or branding is required. Accept free-form briefs, use an
+industry/use-case title and project slug when no customer is named, and never invent a customer identity.
 
 ## v4 — Production craft
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.2.4 - Flexible use-case briefs and energetic narration
+
+- Support customer-specific and generic industry demos from structured or prose-only briefs, without mandatory branding.
+- Specify warm, engaged narration, modest pacing and final-mix verification after any tempo change.
+- Preserve Claude commands, Codex Markdown routing, shared rendering and existing timing/privacy gates.
+
+## 5.2.3 - Verified narration and optional attribution
+
+- Verify OCI Speech's audible output using transcription; retry garbled takes rather than trusting speech marks.
+- Honor an explicit no-creator-credit brief while preserving source license notices.
+- Synchronize voice handoffs, smooth camera guidance, and real-click evidence across both runtimes.
+
 ## 5.2.1 — Claude Code and Codex parity
 
 - Added a Codex plugin manifest over the same `demo-video-builder` skill used by Claude Code.

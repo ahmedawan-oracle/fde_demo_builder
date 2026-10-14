@@ -1,7 +1,13 @@
 # Customer proof films: story first, product proof second
 
-Use this treatment when the brief asks for a prospect-specific film rather than a feature walkthrough. It applies
-the production-film pipeline to a customer world, then hands the story to real product evidence.
+Use this treatment for a prospect-specific film or a generic industry use case rather than a feature walkthrough.
+It applies the production-film pipeline to a customer or industry world, then hands the story to real product evidence.
+A customer name, logo and customer engagement are optional. Accept prose-only briefs and preserve free-form
+requirements. For a generic demo, use an industry/use-case title and slug; never invent customer branding.
+In the historical `customer-story` template, replace example company names with the industry/use-case title.
+Use an "Industry demo - synthetic data" disclosure instead of the fictional-company caption; keep synthetic-data
+disclosure visible or spoken whenever synthetic data is used. Interpret customer beats as industry/operator beats;
+no example branding survives.
 
 ## Learn craft from a reference, never copy content
 
@@ -30,7 +36,8 @@ show fewer complete proofs, not montage a long capability list.
 
 ## Visual and sound language
 
-- Derive a contrast-checked skin from the approved brand kit. Keep product footage in its recorded colours.
+- Derive a contrast-checked skin from the approved brand kit, or use a shipped default skin when none is supplied.
+  Keep product footage in its recorded colours.
 - Use one recurring visual idea from the customer domain, one architecture/ontology sequence, and no more than
   three transition techniques. Each product beat establishes the whole screen before a purposeful push-in.
 - Keep an instrumental bed across most of the film, carved beneath narration. Place restrained SFX on major act
