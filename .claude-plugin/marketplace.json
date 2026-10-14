@@ -4,14 +4,14 @@
     "name": "Ahmed Awan - Forward Deployed Engineering Team"
   },
   "metadata": {
-    "version": "5.2.1",
+    "version": "5.2.2",
     "description": "Single-plugin marketplace for FDE Demo Builder."
   },
   "plugins": [
     {
       "name": "fde-demo-builder",
       "description": "Build polished narrated demo films from real screen recordings with production QA.",
-      "version": "5.2.1",
+      "version": "5.2.2",
       "source": "./",
       "category": "productivity",
       "keywords": ["demo", "video", "ffmpeg", "voiceover", "screen-recording", "fde"]
