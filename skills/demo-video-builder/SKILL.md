@@ -36,6 +36,9 @@ in source packages regardless of the film preference. → `references/credit-foo
   deliberate exception, not the production default. Edge TTS remains supported as a cloud provider; approved OCI Speech
   `TTS_2_NATURAL` is available through the same multi-voice generator. → `references/multi-voice.md`,
   `references/oci-speech.md`
+- **Verify audible words.** OCI narration must pass actual-audio transcription before accepting a take. Plausible
+  provider speech marks, valid codecs and correct levels can coexist with garbled synthesis. Check the final mixed
+  speech against the script too; regenerate failed takes.
 - **Clicks are evidence.** Preserve real click telemetry or reconstruct only the recorded pointer path with
   `CURSOR`; show a restrained ring and press response on meaningful actions. Never decorate a screen with clicks that
   did not occur. → `references/recording-native.md`

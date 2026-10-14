@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills" / "demo-video-builder" / "scripts"))
 
 from tts_providers import bump_speed, normalize_voice, parse_oci_response  # noqa: E402
+import tts_providers
 
 
 def main() -> None:
@@ -34,6 +36,17 @@ def main() -> None:
     decoded, words = parse_oci_response(payload, tempo=0.96)
     assert decoded == audio
     assert words == [{"t": 1.0, "w": "Dupal"}]
+    tts_providers._speech_verifiers["small.en"] = SimpleNamespace(
+        transcribe=lambda path, **options: ([SimpleNamespace(text="Dupal service teams act sooner.")], None)
+    )
+    tts_providers.verify_audio_content("Dupal service teams act sooner.", "unused.mp3")
+    try:
+        tts_providers.verify_audio_content("Our notebook builds a scored district summary.", "unused.mp3")
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("Mismatched speech was accepted")
+    tts_providers._speech_verifiers.clear()
     print("Voice provider adapters are valid.")
 
 

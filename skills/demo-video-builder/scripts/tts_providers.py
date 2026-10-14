@@ -10,7 +10,34 @@ import json
 import os
 import subprocess
 import tempfile
+import re
+from difflib import SequenceMatcher
 from pathlib import Path
+
+_speech_verifiers = {}
+
+
+def speech_verifier(language: str):
+    model_name = "small.en" if language.startswith("en") else "small"
+    if model_name not in _speech_verifiers:
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError as exc:
+            raise ImportError("OCI narration verification requires faster-whisper") from exc
+        _speech_verifiers[model_name] = WhisperModel(model_name, device="cpu", compute_type="int8")
+    return _speech_verifiers[model_name]
+
+
+def verify_audio_content(text: str, path: str, language: str = "en-US") -> None:
+    """Reject valid audio containers that contain garbled synthesis."""
+    verifier = speech_verifier(language)
+    segments, _ = verifier.transcribe(path, beam_size=5, vad_filter=False,
+                                     language=language.split("-")[0])
+    recognized = " ".join(segment.text.strip() for segment in segments)
+    normalize = lambda value: re.sub(r"[^\w]+", " ", value.casefold()).strip()
+    score = SequenceMatcher(None, normalize(text), normalize(recognized), autojunk=False).ratio()
+    if score < 0.80:
+        raise RuntimeError(f"OCI Speech rendered unintelligible or mismatched audio (content score {score:.2f})")
 
 
 def normalize_voice(raw: object) -> dict[str, object]:
@@ -121,6 +148,7 @@ def _render_oci(text: str, voice: dict[str, object], speed: float, path: str) ->
         duration = float(result.stdout.strip())
         if any(float(word["t"]) < 0 or float(word["t"]) >= duration for word in words):
             raise RuntimeError("OCI Speech word offsets fall outside the decoded audio duration")
+        verify_audio_content(text, path, str(voice["language"]))
     return words
 
 
@@ -132,6 +160,8 @@ async def render_voice(
     tries: int = 4,
 ) -> list[dict[str, object]]:
     """Render a phrase and return word offsets relative to that phrase."""
+    if voice["provider"] == "oci_speech":
+        await asyncio.to_thread(speech_verifier, str(voice["language"]))
     for attempt in range(tries):
         try:
             if voice["provider"] == "oci_speech":
