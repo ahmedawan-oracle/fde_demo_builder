@@ -592,6 +592,9 @@ def captions():
 
 # ---------------------------------------------------------------- 6. credit (mandatory)
 def credit():
+    if C.get('creator_credit', True) is False:
+        os.replace(PRE, FILM)
+        return
     print('[6/7] credit (mandatory)')
     sys.path.insert(0, HERE)
     import credit as CR

@@ -8,14 +8,15 @@ description: Build or QA polished, voice-narrated demo videos from screen record
 Turn one screen recording into a polished, narrated, privacy-clean demo video — **fully scripted**, no
 video editor.
 
-## MANDATORY: the end-screen credit
+## End-screen credit preference
 
-Every video made with this plugin — v1, v2, v3, v4, v5, cut-downs and re-exports — ends with one small line,
+By default, videos made with this plugin — v1, v2, v3, v4, v5, cut-downs and re-exports — end with one small line,
 centred in the footer of the end screen: **"Crafted with FDE Demo Builder · by Ahmed Awan"**. `credit.py`
 stamps it (last 4 s, fade-in, auto light/dark) and verifies it; `build.py`, `assemble.example.sh` and
 `build_film.py` call it as their final step, `qa_film.py` and the `demo-qa-reviewer` agent fail a video
-without it. Never skip, reword, restyle, move or cover it; custom pipelines must call `python credit.py stamp`
-on the final file. → `references/credit-footer.md`
+without it in the default mode. Honor an explicit request to omit creator attribution by setting
+`"creator_credit": false` in `film.json`; the builder omits it and QA verifies its absence. Preserve license notices
+in source packages regardless of the film preference. → `references/credit-footer.md`
 
 ## Operating principles (read first)
 
@@ -30,6 +31,17 @@ on the final file. → `references/credit-footer.md`
   reads the pixels, not your intentions. → `references/privacy-scrubbing.md`, `references/privacy-leak-gate.md`
 - **One clock.** Narration word times drive every cut, move, caption and sound (`wt(phase, word)`); every
   visual is a pure function of `t`; two renders are byte-identical.
+- **Cast, do not announce.** Default to two or three warm, role-based presenters: narrator for the stakes and
+  turns, guide for product proof, and at most one short customer persona. A single undifferentiated TTS voice is a
+  deliberate exception, not the production default. Edge TTS remains supported as a cloud provider; approved OCI Speech
+  `TTS_2_NATURAL` is available through the same multi-voice generator. → `references/multi-voice.md`,
+  `references/oci-speech.md`
+- **Clicks are evidence.** Preserve real click telemetry or reconstruct only the recorded pointer path with
+  `CURSOR`; show a restrained ring and press response on meaningful actions. Never decorate a screen with clicks that
+  did not occur. → `references/recording-native.md`
+- **Stable camera.** Render camera movement from the film clock with subpixel transforms. Establish, push, hold,
+  and pull or match into the next shot; integer crop stepping, oscillating drift and low-rate screenshot upsampling
+  are blockers. → `references/cinematic-grammar.md`, `references/motion-scans.md`
 - **Cut the dead air.** Spinners, loads and idle hands are the difference between a slog and a tight film.
 - **One source of truth** per workflow (`demo_config.py`, `vo_script.py` + `STORYBOARD.md` + the ledgers).
   Change the source, re-run — never hand-edit intermediate files.
@@ -48,7 +60,7 @@ Then `gen_vo.py` → `build.py` → `out/demo.mp4`. Pitfalls: `references/ffmpeg
 
 ## v2 — Story rebuilds: b-roll acts + a multi-voice cast
 
-Review the source (frames + transcript) → write `vo_script.py` (2–3 voices, SCENES + PLACED beats) →
+Review the source (frames + transcript) → write `vo_script.py` (2–3 warm role-based voices, SCENES + PLACED beats) →
 `gen_vo_multivoice.py` (word timestamps) → clock-driven b-roll scenes (`frame(t)`, `wt()`, flakes, Ken Burns)
 QA'd with `shot.js` and rendered with `render_scene.js` → `assemble.sh`. B-roll is clearly stylised and
 fictional; recorded segments are real screens only. → `references/broll-scenes.md`, `references/multi-voice.md`.

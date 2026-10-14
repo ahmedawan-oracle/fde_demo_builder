@@ -34,7 +34,8 @@ Read them to learn the beat boundaries, where masks and zooms were applied, and 
      no frozen-looking stall that isn't an intentional hold.
    - **Readability / framing:** tables legible; nothing clipped off the sides; chrome-cover colour matches the app.
    - **Playback:** runs to the outro; no black or corrupt frames.
-4. **Credit (mandatory):** run `python credit.py check <video>` (ships in the project; else
+4. **Credit preference:** when `film.json` sets `creator_credit=false`, verify the creator attribution is absent.
+   Otherwise run `python credit.py check <video>` (ships in the project; else
    `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/credit.py`) and Read the final-second frame. The footer
    must read exactly "Crafted with FDE Demo Builder · by Ahmed Awan", centred, small, legible. Missing, reworded,
    cropped or covered = **BLOCKER**.

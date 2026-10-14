@@ -35,6 +35,8 @@ python3 -c 'import pathlib; line=next(x for x in pathlib.Path("skills/demo-video
 python3 -m json.tool .claude-plugin/plugin.json >/dev/null
 python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 python3 -m json.tool .claude-plugin/marketplace.json >/dev/null
+python3 -m py_compile skills/demo-video-builder/scripts/tts_providers.py skills/demo-video-builder/scripts/gen_vo_multivoice.py
+python3 scripts/test_tts_providers.py
 python3 scripts/validate_film_templates.py
 
 echo "Claude/Codex manifests and shared Markdown routes are aligned at $claude_version."

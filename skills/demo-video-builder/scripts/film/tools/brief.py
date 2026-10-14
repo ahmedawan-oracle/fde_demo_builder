@@ -188,7 +188,7 @@ def validate(brief, qa=None):
         if v and v not in allowed:
             E.append('%s "%s" must be one of %s' % (field, v, '|'.join(allowed)))
     cr = ' '.join(str(f.get('credit', '')).split())
-    if cr and cr != CREDIT:
+    if cr and cr.lower() not in ('none', 'omit', 'false') and cr != CREDIT:
         E.append('credit must read exactly "%s" (found "%s") — it is mandatory and verbatim' % (CREDIT, cr))
     hl = str(f.get('honesty_line', '')).strip()
     if hl and qa is not None and hl.lower() not in [p.lower() for p in qa.get('required_phrases', [])]:

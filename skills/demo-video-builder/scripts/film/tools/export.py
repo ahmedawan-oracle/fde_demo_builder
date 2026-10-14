@@ -278,16 +278,18 @@ class Exporter:
     def finish(self, path, preset, lufs, check_credit=True, extra=None):
         """credit.check + loudness probe + stable copy + ledger record. Deletes and raises when the credit is missing."""
         info = probe(path)
-        credit_ok = self.CR.check(path, verbose=False) if check_credit else None
+        wants_credit = self.cfg.get('creator_credit', True) is not False
+        credit_present = self.CR.check(path, verbose=False) if check_credit else None
+        credit_ok = (credit_present if wants_credit else not credit_present) if check_credit else None
         if check_credit and not credit_ok:
             os.remove(path)
-            raise RuntimeError('REFUSING %s: the FDE Demo Builder credit is not legible on its end screen' % os.path.basename(path))
+            raise RuntimeError('REFUSING %s: creator attribution does not match film.json' % os.path.basename(path))
         loud = measure_loudness(path, lufs or LUFS_NARRATION) if info['has_audio'] else None
         latest = re.sub(r'_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(\.\w+)$', r'\1', path)
         shutil.copyfile(path, latest)
         rec = {'preset': preset, 'file': os.path.relpath(path, self.project).replace('\\', '/'), 'latest': os.path.relpath(latest, self.project).replace('\\', '/'),
                'dur': round(info['dur'], 2), 'size_mb': round(info['bytes'] / 1e6, 2), 'w': info['w'], 'h': info['h'],
-               'credit': 'PRESENT' if credit_ok else ('n/a' if credit_ok is None else 'MISSING'),
+               'credit': ('PRESENT' if wants_credit else 'OMITTED') if credit_ok else ('n/a' if credit_ok is None else 'MISMATCH'),
                'lufs_target': lufs, 'lufs': round(loud['I'], 2) if loud else None, 'tp': round(loud['TP'], 2) if loud else None}
         rec.update(extra or {})
         self.outputs.append(rec)
@@ -431,9 +433,12 @@ class Exporter:
             band = {'mode': 'band', 'band_y': [by, by + bh], 'scale': round(W / sw, 3)}
         pre = os.path.join(self._tmp.name, preset + '_pre.mp4')
         sh(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', self.film, '-i', wav] + graph + ['-map', '1:a:0',
-            '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-shortest', pre])
+            '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-shortest', '-movflags', '+faststart', pre])
         out = self.out_path(preset)
-        self.CR.stamp(pre, out)                                 # credit for the new canvas (credit.py prints one line)
+        if self.cfg.get('creator_credit', True) is False:
+            shutil.copyfile(pre, out)
+        else:
+            self.CR.stamp(pre, out)
         rec = self.finish(out, preset, LUFS_NARRATION, extra=band)
         stable = os.path.splitext(os.path.join(self.project, rec['latest']))[0]      # note + srt beside the stable copy
         rec['captions_note'] = os.path.relpath(self._caption_note(stable + '.mp4', W, H, band), self.project).replace('\\', '/')
@@ -461,6 +466,12 @@ class Exporter:
                % (W, H, int(W * TITLE_SAFE), W - int(W * TITLE_SAFE), ts, H - ts, cb, H - cb), '', where, '', place, '',
                'The mandatory FDE Demo Builder credit was re-stamped for this canvas by credit.py and verified (credit.check).']
         note = os.path.splitext(out)[0] + '.captions.md'
+        if self.cfg.get('creator_credit', True) is False:
+            txt = [line.replace('the small original credit', 'other text')
+                   .replace('above the credit band', 'above the bottom safe margin')
+                   .replace('is the credit band — keep it clear', 'is a bottom safe margin')
+                   for line in txt]
+            txt[-1] = 'Creator attribution is omitted as configured in film.json.'
         open(note, 'w', encoding='utf-8').write('\n'.join(txt) + '\n')
         return note
 
@@ -534,14 +545,15 @@ class Exporter:
         d = ['# DELIVERY — %s' % os.path.basename(self.film), '', '| | |', '|---|---|', '| duration | %.2f s |' % self.info['dur'],
              '| picture | %dx%d %s |' % (self.info['w'], self.info['h'], self.info['vcodec']), '| size | %.1f MB |' % (self.info['bytes'] / 1e6),
              '| loudness | I %.2f LUFS, TP %.2f dBTP (target -16 / -1.5) |' % (loud['I'], loud['TP']) if loud else '| loudness | no audio |',
-             '| credit | %s |' % ('PRESENT' if self.CR.check(self.film, verbose=False) else 'MISSING'),
+             '| credit | %s |' % ('OMITTED' if self.cfg.get('creator_credit', True) is False else ('PRESENT' if self.CR.check(self.film, verbose=False) else 'MISSING')),
              '| ledger | %s |' % ('%d assets, 0 licence UNKNOWN (media_index.md)' % len(self.ledger.current()) if self.ledger else 'none'),
              '| QA | run `python qa_film.py` in the project; attach its output when sharing for approval |', '',
              '## In this pack', ''] + ['- ' + rel(f) for f in files] + (['', '## YouTube chapters', '', 'Paste into the video description (tools/chapters.py, starts snapped to the cuts):', '', '```', chapters_block, '```'] if chapters_block else []) + ['',
              ] + (['## Reviewer notes — proposed, decided', '', 'Whole-cut notes snapped to the nearest edit boundary (tools/review_notes.py). Rejections are kept on purpose: the reviewer proposes, the editor decides.', '', notes_md, ''] if notes_md else []) + [
              '## Decisions kept manual', '', 'What no gate decided — a person did, and here is the record.', '', manual, ''] + [
              '## Feedback wanted', '', 'Say which: story · visuals · timing · facts (claims.json lists every spoken figure and where it is on screen) · approval.', '',
-             'Fictional company and synthetic data unless the ledger says otherwise. Crafted with FDE Demo Builder · by Ahmed Awan.']
+             'Fictional company and synthetic data unless the ledger says otherwise.' +
+             (' Crafted with FDE Demo Builder · by Ahmed Awan.' if self.cfg.get('creator_credit', True) is not False else '')]
         delivery = os.path.join(self._tmp.name, 'DELIVERY.md'); open(delivery, 'w', encoding='utf-8').write('\n'.join(d) + '\n')
         out = os.path.join(self.dir, '%s_share_%s.zip' % (self.stem, self.stamp))
         with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:

@@ -36,7 +36,7 @@ feature walkthrough); without it, offer them and let the author choose or keep t
    - `lib/*.js` → `scenes/lib/` (all of them: grammar, timeline, footage, camera, seams, captions, overlays, blocks, vfx,
      motion, typo, shaders, title3d, blocks2, light, depth, annotate, glass, reveals, stage, charts, compare, cursor, hud, reel)
    - `gates/*.py` → `gates/` · `tools/*` → `tools/` · `audio/*.py` → `audio/` · `skins/` → `skins/` · `studio/` → `studio/`
-3. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/` copy `gen_vo_multivoice.py`, `credit.py` and
+3. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/` copy `gen_vo_multivoice.py`, `tts_providers.py`, `credit.py` and
    `requirements.txt` into `$0/`.
 3a. **Brief before any pixel.** The copied `BRIEF.md` is a fictional example, not a record of requester answers. If the
    request names no angle, run the pitch round: five tellings (the subject's world · the emotion · the audience met or

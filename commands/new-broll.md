@@ -16,6 +16,7 @@ Do the following:
 2. Copy from `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/` into `$0/`:
    - `vo_script.example.py`        → `$0/vo_script.py`
    - `gen_vo_multivoice.py`        → `$0/gen_vo_multivoice.py`
+   - `tts_providers.py`            → `$0/tts_providers.py`
    - `render_scene.js`             → `$0/render_scene.js`
    - `shot.js`                     → `$0/shot.js`
    - `assemble.example.sh`         → `$0/assemble.sh`

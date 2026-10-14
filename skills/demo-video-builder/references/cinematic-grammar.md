@@ -15,8 +15,10 @@ Measured rules that separate a booth-ready film from a screen recording with mus
 
 ## Voices
 
-3–4 edge-tts voices: a narrator for the story, first-person persona voices for each act, and the
-product's own voice for its answers. Rates +0 … +8 %. Speak on-screen text exactly as shown.
+Use two or three warm role-based voices: narrator for the story and turns, guide for product proof, and at most one
+first-person customer persona. A fourth product voice is useful only when the product itself speaks. Edge TTS is the
+default; approved OCI Speech `TTS_2_NATURAL` is optional. Speak on-screen text exactly as shown and leave a tight,
+audible handoff between speakers.
 
 ## Camera
 
@@ -25,6 +27,21 @@ product's own voice for its answers. Rates +0 … +8 %. Speak on-screen text exa
   pull back in ~1 s. Push onto the thing the voice is naming, landing on its word.
 - Nothing static for more than ~5 s: long reads get a slow push (2–3 %/s).
 - Browser-eased scrolls: `1 − (1 − u)³` over ~1.1 s, starting ~0.3 s before the word.
+- Use clock-driven CSS/Canvas transforms or FDE camera primitives, which retain subpixel positions. Do not build
+  camera motion from integer `crop`/`zoompan` steps, alternate between neighbouring crop rectangles, or add sinusoidal
+  wandering. If the only source is a low-rate screenshot sequence, select a clean parked frame and move the camera
+  deterministically instead of duplicating frames to imitate a 30 fps recording.
+- End a shot at zero or near-zero camera velocity before a dissolve, or match its position and velocity into the next
+  shot. Run `motion_diag.py --spikes --pan-halves`; inspect every reported boundary before delivery.
+
+## Pointer and clicks
+
+- Capture real pointer telemetry where possible. With median stills, restore that path using `lib/cursor.js` so the
+  cursor travels with the product pixels through camera moves.
+- Show a restrained click ring and short press response on meaningful actions. Keep the real response visible and
+  place any click sound away from speech onsets.
+- Never add a decorative click, move the pointer to an element that was not used, or imply a result the capture does
+  not contain.
 
 ## Cuts
 

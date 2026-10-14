@@ -158,7 +158,8 @@ def run(ctx):
     # 5 — credit font
     CR = _credit_module(project)
     fonts = [f for f in (getattr(CR, 'FONT_CANDIDATES', []) if CR else []) if os.path.exists(f)]
-    out.append(('credit font', bool(fonts), os.path.basename(fonts[0]) if fonts else 'none of credit.py FONT_CANDIDATES exists — install a system font'))
+    if cfg.get('creator_credit', True) is not False:
+        out.append(('credit font', bool(fonts), os.path.basename(fonts[0]) if fonts else 'none of credit.py FONT_CANDIDATES exists — install a system font'))
     return out
 
 
