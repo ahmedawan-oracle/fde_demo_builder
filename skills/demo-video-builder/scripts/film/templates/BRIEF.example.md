@@ -16,7 +16,7 @@ honesty_line: "Acme is fictional, and so is its data."
 review: with-me                         # with-me (plan → sketch → build → final look, ask at each) | drive-it (post decisions, keep going)
 storyboard: yes                         # yes → STORYBOARD.md + storyboard.html pass before any render
 placeholders: no                        # may a placeholder beat ship? no = tools/storyboard.py check --build fails on one
-credit: "Crafted with FDE Demo Builder · by Ahmed Awan"   # mandatory, verbatim — never reworded, moved or covered
+credit: "Crafted with FDE Demo Builder · by Ahmed Awan"   # default; use none with film.json creator_credit=false when omission is requested
 ---
 
 ## Intent
@@ -46,7 +46,7 @@ shift", "the audit trail" — see Notes).
 - the on-screen question spoken verbatim and typed word for word (hero prop)
 - every product beat opens on the original full screen, then zooms
 - the truthfulness line spoken once and shown on the title card
-- the mandatory credit on the end screen
+- the default credit on the end screen, unless omission is explicitly requested
 
 ## Deferred asks
 - lower-third copy per persona (after the shot log)

@@ -18,12 +18,15 @@ _speech_verifiers = {}
 
 
 def speech_verifier(language: str):
-    model_name = "small.en" if language.startswith("en") else "small"
+    model_path = os.environ.get("FDE_WHISPER_MODEL_PATH")
+    if model_path and not Path(model_path).is_dir():
+        raise ValueError("FDE_WHISPER_MODEL_PATH must be an existing local model directory")
+    model_name = model_path or ("small.en" if language.startswith("en") else "small")
     if model_name not in _speech_verifiers:
         try:
             from faster_whisper import WhisperModel
         except ImportError as exc:
-            raise ImportError("OCI narration verification requires faster-whisper") from exc
+            raise ImportError("Narration verification requires faster-whisper") from exc
         _speech_verifiers[model_name] = WhisperModel(model_name, device="cpu", compute_type="int8")
     return _speech_verifiers[model_name]
 
@@ -37,7 +40,7 @@ def verify_audio_content(text: str, path: str, language: str = "en-US") -> None:
     normalize = lambda value: re.sub(r"[^\w]+", " ", value.casefold()).strip()
     score = SequenceMatcher(None, normalize(text), normalize(recognized), autojunk=False).ratio()
     if score < 0.80:
-        raise RuntimeError(f"OCI Speech rendered unintelligible or mismatched audio (content score {score:.2f})")
+        raise RuntimeError(f"Narration contains unintelligible or mismatched audio (content score {score:.2f})")
 
 
 def normalize_voice(raw: object) -> dict[str, object]:
@@ -62,6 +65,7 @@ def normalize_voice(raw: object) -> dict[str, object]:
             "voice": str(raw["voice"]),
             "speed": tempo,
             "profile": str(raw.get("profile", os.environ.get("OCI_CLI_PROFILE", "DEFAULT"))),
+            "config_file": raw.get("config_file", os.environ.get("OCI_CLI_CONFIG_FILE")),
             "region": raw.get("region"),
             "auth": raw.get("auth"),
             "language": str(raw.get("language", "en-US")),
@@ -122,6 +126,8 @@ def _render_oci(text: str, voice: dict[str, object], speed: float, path: str) ->
             "--file", str(response),
             "--configuration", json.dumps(config, separators=(",", ":")),
         ]
+        if voice.get("config_file"):
+            cmd += ["--config-file", str(voice["config_file"])]
         if voice.get("region"):
             cmd += ["--region", str(voice["region"])]
         if voice.get("auth"):

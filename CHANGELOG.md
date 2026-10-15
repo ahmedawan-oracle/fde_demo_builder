@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.2.5 - Kinetic story treatment
+
+- Preserve custom OCI config paths in narration and allow an explicit local ASR model path for pinned/offline checks.
+
+- Add a shared story-film recipe for customer and generic industry films using the existing renderer and motion libraries.
+- Tie visual emphasis to narration, use one evidence ledger, and adapt duration, casting and motion to the brief.
+- Distinguish calm and cinematic treatments; require a representative pilot and project render preflight.
+- Keep recreated explanatory art separate from real product proof and honor the requested creator-credit setting.
+
 ## 5.2.4 - Flexible use-case briefs and energetic narration
 
 - Support customer-specific and generic industry demos from structured or prose-only briefs, without mandatory branding.

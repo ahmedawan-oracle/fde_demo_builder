@@ -1,6 +1,6 @@
 ---
 name: demo-qa-reviewer
-description: Adversarially QA a built demo video for privacy leaks, VO-sync drift, readability, fabrication, playback integrity, footage honesty (no recolour, transitions over footage ≤ 0.5 s, charts and marks on claimed figures), determinism and the mandatory FDE Demo Builder end-screen credit. Invoke after building/rebuilding a demo (out/demo.mp4 or the film MP4). Returns a ranked findings report; does not modify files.
+description: Adversarially QA a built demo video for privacy leaks, VO-sync drift, readability, fabrication, playback integrity, footage honesty (no recolour, transitions over footage ≤ 0.5 s, charts and marks on claimed figures), determinism and the configured creator-credit presence or absence. Invoke after building/rebuilding a demo (out/demo.mp4 or the film MP4). Returns a ranked findings report; does not modify files.
 tools: Bash, Read, Glob, Grep
 ---
 

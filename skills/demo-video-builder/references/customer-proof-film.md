@@ -19,6 +19,9 @@ product evidence.
 
 ## Treatment
 
+For a kinetic/cinematic brief, use [story-film-recipe.md](story-film-recipe.md) with the base production scaffold.
+The `customer-story` template below intentionally uses calm motion; choose it when that is the requested treatment.
+
 Use the `customer-story` scaffold and divide the film into three acts:
 
 1. **Customer world and decision.** Establish the industry, the decision that is currently hard, and one measurable

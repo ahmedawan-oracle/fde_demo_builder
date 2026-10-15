@@ -15,7 +15,7 @@ A brief is YAML frontmatter (one key per confirmed field) plus prose sections: I
 Deferred asks, Assets, Bans, Notes (templates/BRIEF.example.md). The question protocol it encodes:
 one field per message, recommended option first with its receipt, inference is not an answer, the two run-shape
 questions (review with-me|drive-it, storyboard yes|no) last, one integration check, stated and inferred shown as two
-groups, and a revision to the summary is not a confirmation. Render stays user-gated in both run shapes.
+groups, and a revision to the summary is not a confirmation. Render stays user-gated unless end-to-end production was explicitly delegated.
 Stdlib only; never raises on a malformed brief — it reports.
 """
 import json, os, re, sys
@@ -25,7 +25,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES = os.path.normpath(os.path.join(HERE, '..', 'templates'))
-CREDIT = 'Crafted with FDE Demo Builder · by Ahmed Awan'           # mandatory, verbatim (credit.py stamps and checks it)
+CREDIT = 'Crafted with FDE Demo Builder · by Ahmed Awan'           # default, verbatim when enabled (credit.py stamps and checks it)
 
 DESTINATIONS = {
     #  name       aspects accepted (first = derived default)   length_s range   receipt
@@ -67,12 +67,12 @@ QUESTIONS = [
     ('storyboard', 'Review a storyboard first — yes | no? Recommended: yes for anything beyond two beats (plan in chat, '
                    'sketch sheet, then build).'),
     ('review', 'Review with me, or drive it? Recommended: with-me — ask at each pass; drive-it posts the same decisions '
-               'with reasons and keeps going. Rendering waits for you in both.'),
+               'with reasons and keeps going. Rendering waits for you unless end-to-end production was delegated.'),
     ('placeholders', 'May a placeholder beat ship — yes | no? Recommended: no — a placeholder holds a slot in the plan, '
                      'never a frame in the film.'),
     ('name', 'What is the film called in film.json / vo_script.py? Recommended: "film" — the sample uses it.'),
-    ('credit', 'The mandatory credit line, verbatim: "%s". It is stamped by build_film.py; the brief records it so '
-               'nobody plans a closing card that covers it.' % CREDIT),
+    ('credit', 'The default credit line, verbatim: "%s". If omission was requested, use none and set '
+               'film.json creator_credit=false; otherwise reserve its closing space.' % CREDIT),
 ]
 REQUIRED = [q[0] for q in QUESTIONS]
 
@@ -189,7 +189,7 @@ def validate(brief, qa=None):
             E.append('%s "%s" must be one of %s' % (field, v, '|'.join(allowed)))
     cr = ' '.join(str(f.get('credit', '')).split())
     if cr and cr.lower() not in ('none', 'omit', 'false') and cr != CREDIT:
-        E.append('credit must read exactly "%s" (found "%s") — it is mandatory and verbatim' % (CREDIT, cr))
+        E.append('credit must read exactly "%s" (found "%s") — use the default verbatim, or none for an explicit omission' % (CREDIT, cr))
     hl = str(f.get('honesty_line', '')).strip()
     if hl and qa is not None and hl.lower() not in [p.lower() for p in qa.get('required_phrases', [])]:
         W.append('honesty_line is not in qa.json required_phrases — run brief.py --seed-qa --write')

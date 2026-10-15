@@ -1,5 +1,5 @@
 ---
-description: Scaffold a v5 production film — real-pixel footage (original full screen → zoom, real scrolls and typing) on a word-synced multi-voice narration; GSAP timelines on the clock, kinetic type, WebGL transitions, 3D titles, story blocks, light / depth / annotation, reveals, a redrawn cursor, idle detection, an OCR leak gate, karaoke captions, skins, a live studio and a review pack; deterministic software-GL render, 60+ QA gates and the mandatory credit.
+description: Scaffold a v5 production film — real-pixel footage (original full screen → zoom, real scrolls and typing) on a word-synced multi-voice narration; GSAP timelines on the clock, kinetic type, WebGL transitions, 3D titles, story blocks, light / depth / annotation, reveals, a redrawn cursor, idle detection, an OCR leak gate, karaoke captions, skins, a live studio and a review pack; deterministic software-GL render, 60+ QA gates and the brief's creator-credit preference.
 argument-hint: <project-name> [--template booth-trailer|customer-story|feature-walkthrough]
 ---
 
@@ -15,6 +15,9 @@ feature walkthrough); without it, offer them and let the author choose or keep t
 
 0. **Choose the scaffold.** Resolve the requested template (or the Acme default) before creating files. Template duration,
    destination and angle are recommendations until the requester confirms them; inference is not an answer.
+   When the requester has delegated direction or supplied an autonomous brief, make reasonable documented choices
+   from that brief. For a cinematic/kinetic story, read `references/story-film-recipe.md` and use the base scaffold;
+   do not force the calm customer-story template. The recipe is a treatment, not another `--template` option.
 1. Create `$0/` in the current working directory (stop politely if it already exists; never overwrite).
 2. From `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/film/` copy into `$0/`:
    - `vo_script.example.py` → `vo_script.py` · `clips.example.json` → `clips.json` · `film.example.json` → `film.json`
@@ -41,7 +44,10 @@ feature walkthrough); without it, offer them and let the author choose or keep t
 3a. **Brief before any pixel.** The copied `BRIEF.md` is a fictional example, not a record of requester answers. If the
    request names no angle, run the pitch round: five tellings (the subject's world · the emotion · the audience met or
    broken · the anti-pattern inverted · an unusual format), three lines each, at least two unlikely ones, all five before
-   a recommendation; mixing is an answer; one round. Fill the brief one field per message, recommended option first with
+   a recommendation; mixing is an answer; one round. For a delegated/autonomous brief, instead choose an angle,
+   fill unanswered creative fields under `## Inferred`, and record the reasons without starting another questionnaire.
+   This never substitutes for authorization or a human sign-off that was explicitly required.
+   Otherwise fill the brief one field per message, recommended option first with
    its receipt; skip fields the request already answered. Reconcile the chosen template's suggested duration and
    destination here, put defaults only under `## Inferred`, and hand off with STATED and INFERRED as two groups. Add the
    `## Never on screen` list (customer and colleague names the recording may show — the leak gate fuzzy-matches them).
@@ -105,8 +111,9 @@ feature walkthrough); without it, offer them and let the author choose or keep t
      word; a sync point that must land anyway carries `"force": true` (reported as `forced: true`, still counted by
      `sfx one impact`). Chapters: `"chapters": true` merges automatically for films under 60 s (`{"merge": "auto"}`;
      set `true`/`false` to override) — a 35 s trailer gets one chapter, not six.
-   - **Customer/industry proof and localization.** For a prospect-specific or generic industry story, follow `references/customer-proof-film.md`:
-     measure references for craft only, use the customer-story treatment, and map every setup claim to later product
+   - **Customer/industry proof and localization.** For a prospect-specific or generic industry story, follow `references/customer-proof-film.md`
+     and, for a kinetic treatment, `references/story-film-recipe.md`:
+     measure references for craft only, choose the calm or kinetic treatment, and map every setup claim to later product
      proof. When localization is requested, emit and complete the source-locked caption template, set
      `captions.translation` with `captions.burn:false`, and export `burn_ass`; keep the narration clock and product
      footage unchanged.
@@ -158,7 +165,7 @@ Remind them of the hard rules:
   the machine is busy with an empty `framemd5` diff.
 - Type floor: labels, kickers, ticks 16 stage px (24 px at 1080p), body 18, headlines 40 — `design.md → scale`.
 - No customer names or internal identifiers in the scenes, the VO, the examples or `events.jsonl` in the repo.
-- **The FDE Demo Builder credit ("Crafted with FDE Demo Builder · by Ahmed Awan") is mandatory on the end screen and on
-  every export.** The build stamps it and QA fails without it. Never remove it or alter it.
+- **Creator credit follows the brief.** Keep the default credit on every export unless omission is explicitly
+  requested. For omission, set `film.json` to `creator_credit:false` and `BRIEF.md` to `credit: none`; QA verifies absence.
 
 Use forward-slash paths and platform-appropriate copy commands.

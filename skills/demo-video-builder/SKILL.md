@@ -1,6 +1,6 @@
 ---
 name: demo-video-builder
-description: Build or QA polished, voice-narrated demo videos from screen recordings. Use for "build a demo video", "narrate this recording", "make a demo from this screen capture", cutting thinking lag, privacy scrubbing, synced voiceover, "add a wow animated opener", "multi voice demo", "b-roll story animation", customer proof films, localized subtitles, booth trailers, production films, kinetic titles, karaoke captions, sound design, transitions, and vertical cuts. Covers real-pixel footage, narration-clock timing, deterministic rendering, mastering, review gates, and the mandatory FDE Demo Builder credit. Also use to scaffold v1 demos, v2 story rebuilds, or v5 production films.
+description: Build or QA polished, voice-narrated demo videos from screen recordings. Use for "build a demo video", "narrate this recording", "make a demo from this screen capture", cutting thinking lag, privacy scrubbing, synced voiceover, "add a wow animated opener", "multi voice demo", "b-roll story animation", customer proof films, localized subtitles, booth trailers, production films, kinetic titles, karaoke captions, sound design, transitions, and vertical cuts. Covers real-pixel footage, narration-clock timing, deterministic rendering, mastering, review gates, and the brief's creator-credit preference. Also use to scaffold v1 demos, v2 story rebuilds, or v5 production films.
 ---
 
 # Demo Video Builder
@@ -85,7 +85,12 @@ bed, two-pass linear loudnorm to −16 LUFS, captions, **credit**) → `qa_film.
 
 ### Customer proof treatment
 
-For either a prospect-specific film or a generic industry use case, use the `customer-story` scaffold and
+For a cinematic or "wow" story with b-roll, kinetic data and an outcome arc, read
+[`references/story-film-recipe.md`](references/story-film-recipe.md). It adapts the existing production scaffold
+to customer or generic industry stories without forcing the calm customer-story template or recreating live proof.
+Use the requested duration, one claims ledger and word-timed motion; verify a short pilot before the full render.
+
+For a calm prospect-specific film or generic industry use case, use the `customer-story` scaffold and
 [`references/customer-proof-film.md`](references/customer-proof-film.md): measure a supplied reference for craft,
 build a short customer or industry-world and data-to-agent setup, then spend the majority of the film on connected real product
 proof. The same reference defines optional reviewed localized captions from the narration's existing cue windows.
@@ -179,7 +184,7 @@ d3-delaunay`), and never touches a product pixel. Gates are footnotes: the devic
 | footage | Every product frame comes from the recording; a redrawn one is a fabrication. | Median stills, stitched pages in the app's own chrome, real 30 fps seqs, small soft blurs for privacy, the original full screen before any zoom. | what to show, what to blur, where to push |
 | scene | Every visual is a pure function of t, or two renders differ. | No wall clock, no CSS transitions, no unseeded random, no will-change; libraries from node_modules by relative path; devices by moment, gates as footnotes. | which device carries each moment |
 | build | A render that cannot be reproduced cannot be reviewed. | Software GL, compositor settle, exact CFR join, the capture-probe fallback when Chrome hangs; every build is a take with its wall time, scene hash and gates. | the take to keep |
-| qa | A broken gate is a failed gate, never a skipped one. | qa_film.py runs the picture and sound checks and every gates/*.py module; measure a failing gate before loosening it; CREDIT is last and cannot be disabled. | which WARNs to act on |
+| qa | A broken gate is a failed gate, never a skipped one. | qa_film.py runs the picture and sound checks and every gates/*.py module; measure a failing gate before loosening it; CREDIT is last and enforces the explicit creator-credit preference. | which WARNs to act on |
 | pairs | A cut is the end frame of one shot meeting the start frame of the next; approve those two stills first. | snapshot.py --pairs, the review pack's Approve start / Approve end, pair_gate on anchors, words and names. | every START and END approval |
 | review | Reviewers open attachments, not repos. | One offline HTML with the frames, the claims, the gates, the honesty flags and a comment box per beat; served locally, same-origin writes only; --lock writes the sign-off. | the sign-off, every open comment |
 | notes | A reviewer proposes; the editor decides and says why. | Whole-cut notes snap to the nearest edit boundary and carry accepted / rejected with a reason; rejections are kept and shipped in DELIVERY.md. | every accept / reject and its reason |
@@ -189,7 +194,7 @@ d3-delaunay`), and never touches a product pixel. Gates are footnotes: the devic
 preflight (doctor, lint, camera ladder, storyboard lock, canary) → render (software GL, compositor sync,
 first-frame settle) → mix (carve, SFX stem, bus chains, bed envelope) → master → captions (.srt/.vtt/.ass) →
 **credit** → ledger → exports (incl. reflow) → storyboard truth pass. `qa_film.py --profile picture` is the
-fast set; `full` runs every module; CREDIT is last and cannot be disabled. The scene loads only the libs it
+fast set; `full` runs every module; CREDIT is last and enforces the explicit creator-credit preference. The scene loads only the libs it
 uses; overlays, marks, glass and captions live in screen space outside `#camera`; nothing may filter the lane.
 
 **Working rules (v5).** Write `seams.json` before the shots; 2–3 techniques per film, one `gl` accent per act
