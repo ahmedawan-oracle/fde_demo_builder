@@ -47,7 +47,7 @@ the carved bed. Templates with everything switched on: templates/films/<booth-tr
 
 The narration is the clock: the total length comes from vo/<name>_phases.json, so picture and sound cannot drift.
 """
-import json, os, re, subprocess, sys
+import json, math, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 C = json.load(open(os.path.join(HERE, 'film.json'), encoding='utf-8'))
@@ -70,7 +70,12 @@ SFX_CFG = C.get('sfx')
 SFX = os.path.join(HERE, SFX_CFG) if isinstance(SFX_CFG, str) and SFX_CFG else None      # v4: a hand-made stem; v5 dict → sfx_auto()
 SFX_DB = float(C.get('sfx_db', -5.0))
 BED_DB = float(C.get('bed_db', -12.0))             # v4 default -12 (was -9): the pan upmix restores 3 dB of voice
-LUFS_I, LUFS_TP, LUFS_LRA = -16.0, -1.5, 11.0
+LRA_CONFIG = C.get('loudness_range', 11.0)
+if LRA_CONFIG is None or isinstance(LRA_CONFIG, bool):
+    raise ValueError('loudness_range must be a number, not null or a boolean')
+LUFS_I, LUFS_TP, LUFS_LRA = -16.0, -1.5, float(LRA_CONFIG)
+if not math.isfinite(LUFS_LRA) or not 1 <= LUFS_LRA <= 50:
+    raise ValueError('loudness_range must be finite and between 1 and 50 LU')
 LIMITER_LATENCY_S = 239 / 48000.0                   # alimiter attack=5 ms look-ahead = 239 samples of delay at 48 kHz (v5.1, measured)
 TAIL = 3.6                                          # music/room tail after the last word (TAIL_S): the closing card HOLDS while the credit lands —
                                                     # credit.py's 4 s window starts at END + TAIL - 4 = END - 0.4, after the lockup's rule has finished
@@ -536,13 +541,30 @@ def tool_versions():
     return ver(['ffmpeg', '-version'], r'ffmpeg version (\S+)'), ver(['node', '--version'], r'v?(\S+)')
 
 
+def video_frames(path):
+    result = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-count_frames',
+                             '-show_entries', 'stream=nb_read_frames', '-of', 'json', path],
+                            check=True, capture_output=True, text=True)
+    frames = int(json.loads(result.stdout)['streams'][0]['nb_read_frames'])
+    if frames <= 0:
+        raise ValueError('Video has no decoded frames: ' + path)
+    return frames
+
+
 def mux():
     print('[4/7] mux')
     ffv, nodev = tool_versions()
+    provenance = 'ffmpeg %s · node %s · %d fps' % (ffv, nodev, FPS)
+    if C.get('creator_credit', True) is not False:
+        provenance = 'FDE Demo Builder 5 · ' + provenance
+    expected_frames = video_frames(SEG)
+    # AAC packet rounding with -shortest can discard the last video frame.
     run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', SEG, '-i', MASTER, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy',
-         '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2', '-shortest',
-         '-metadata', 'comment=FDE Demo Builder 5 · ffmpeg %s · node %s · %d fps' % (ffv, nodev, FPS),
+         '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2', '-t', '%.6f' % (TOTAL + TAIL),
+         '-metadata', 'comment=' + provenance,
          '-movflags', '+faststart', PRE])
+    if video_frames(PRE) != expected_frames:
+        raise SystemExit('REFUSING: mux changed the rendered video frame count.')
 
 
 # ---------------------------------------------------------------- 5. captions
@@ -599,6 +621,8 @@ def credit():
     sys.path.insert(0, HERE)
     import credit as CR
     CR.stamp(PRE, FILM)
+    if video_frames(FILM) != video_frames(SEG):
+        raise SystemExit('REFUSING: credit stamping changed the rendered video frame count.')
     if not CR.check(FILM):
         raise SystemExit('REFUSING: the FDE Demo Builder credit is not legible on the end screen.')
     os.remove(PRE)

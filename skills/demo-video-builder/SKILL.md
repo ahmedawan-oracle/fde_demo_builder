@@ -53,6 +53,8 @@ in source packages regardless of the film preference. → `references/credit-foo
 - **One source of truth** per workflow (`demo_config.py`, `vo_script.py` + `STORYBOARD.md` + the ledgers).
   Change the source, re-run — never hand-edit intermediate files.
 - **QA until clean.** A demo is done when the gates pass and the adversarial reviewer finds nothing.
+- **Rebuilds preserve evidence.** Reuse dated captures honestly; retain accepted takes and hash-bound QA. For
+  recorded-screen holds, privacy false positives and authorized cleanup, see [story-film-recipe.md](references/story-film-recipe.md#rebuild-and-retention).
 
 ## v1 — Polish one recording (7 phases)
 

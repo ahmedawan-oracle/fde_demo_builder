@@ -128,3 +128,30 @@ Delivery requires the evidence, privacy, captions, motion, audio, content-transc
 plus a complete viewing of the final mix. Explicitly report unavailable capabilities, proposed actions and any QA
 still incomplete. The recipe improves production decisions; passing technical checks alone does not certify taste.
 Manually inspect synthetic disclosures wherever scenario figures appear; no single gate verifies this completely.
+
+## Rebuild and Retention
+
+For a film rebuild, dated real captures and matching execution receipts may be reused when they still prove
+the requested story. Disclose reuse; do not call it a fresh live run. Record capture dates and local receipt
+references in claims provenance and redacted delivery notes. Recheck that
+the evidence supports the intended product/version claims; recapture when a current-state claim needs it.
+Recapture is live activity and requires the same authorization as other live work. Without it, omit the
+current-state claim or qualify the evidence as of its capture date; do not log in or rerun workloads implicitly.
+Label intentional recorded-screen holds, use eased subpixel camera moves, and do not pass low-rate screenshots
+off as smooth new interaction. Preserve
+real pointer evidence; never invent clicks. Keep configuration, evaluation, deployment and realized outcomes
+distinct in both script and claims. Omit unavailable components rather than inventing a successful result.
+
+Give each voice a role in the conversation, not equal airtime. Let the score rise between lines and land a
+small number of word-safe transition cues. Reject or regenerate a cold/garbled performance before adding
+tempo processing; ASR similarity alone does not validate pronunciation, warmth or the exact spoken number.
+
+Review OCR false positives in their exact source context. Keep the original findings, review reasons and
+source/frame hashes; never suppress all matches for a short company name or call a sampled scan full-frame.
+Keep raw OCR text and denylists internal; deliver only redacted review summaries with no leaked identifiers.
+Only reuse cached OCR when the decoded pixels match, and bind final QA reports to the delivered MP4 hash.
+An alternative OCR backend is not a pass of another backend's validator; state actual coverage and limitations.
+
+After acceptance, prune superseded exports and regenerable frame/render caches only when authorized. Keep
+the accepted master, captions, claims, QA/review evidence, source captures, approved voice takes, media licenses,
+scene/build scripts and dependency lockfiles. Remove references to deleted projects before pruning them.

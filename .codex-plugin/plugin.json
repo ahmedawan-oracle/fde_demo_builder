@@ -1,6 +1,6 @@
 {
   "name": "fde-demo-builder",
-  "version": "5.2.5",
+  "version": "5.2.6",
   "description": "Build polished narrated demo films from real screen recordings with deterministic rendering, privacy scrubbing, sound design, transitions, and production QA.",
   "author": {
     "name": "Ahmed Awan - Forward Deployed Engineering Team",

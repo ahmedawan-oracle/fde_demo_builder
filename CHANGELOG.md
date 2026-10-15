@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.2.6 - Production rebuild reliability
+
+- Preserve digital-silence loudness time slots with per-channel PCM verification; measurement failures still fail.
+- Preserve the last muxed video frame and honor explicit credit omission in container comments as well as picture.
+- Allow a validated mastering LRA target for short pilots, retaining the existing default and linear-master gate.
+- Add shared rebuild guidance for dated real evidence, role-based voice/motivated sound, privacy review and retention.
+- Regression tests cover silence, anti-phase audio, invalid PCM, band filtering, credit defaults and an actual FFmpeg mux.
+
 ## 5.2.5 - Kinetic story treatment
 
 - Preserve custom OCI config paths in narration and allow an explicit local ASR model path for pinned/offline checks.
