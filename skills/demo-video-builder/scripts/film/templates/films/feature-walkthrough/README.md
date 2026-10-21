@@ -32,7 +32,7 @@ writes `chapters.vtt` + the YouTube block the share pack carries.
 
 ## Using it
 
-`/new-film <name> --template feature-walkthrough` copies these six files over the base scaffold. Then:
+`/new-film <name> --template feature-walkthrough` applies its planning files over the base scaffold. Then:
 
 ```
 python tools/skin_apply.py skins/meridian-dark.json
@@ -43,3 +43,5 @@ python tools/storyboard.py check STORYBOARD.md
 
 Studio taps for the review pack: `out/taps/NN_<label>.jpg`. Everything here is fictional (Acme, synthetic data); `events.jsonl`
 is confidential and stays out of the repo. The credit line is never reworded or moved.
+This is a planning skeleton. Adapt `vo_script.py` and `scenes/shots.js` to its phase and visual vocabulary before
+rendering; the untemplated scaffold is the out-of-box Acme render sample.

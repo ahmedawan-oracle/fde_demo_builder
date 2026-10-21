@@ -57,12 +57,36 @@ def momentary_lufs(path: str, band: tuple[float, float] | None = None) -> np.nda
     pre = 'acrossover=split=%d %d:order=4th[a][b][c];[a]anullsink;[c]anullsink;[b]' % band if band else ''
     af = pre + 'ebur128=metadata=1,ametadata=mode=print:key=lavfi.r128.M:file=-'
     cmd = ['ffmpeg', '-nostdin', '-v', 'error', '-i', path]
-    cmd += ['-filter_complex', '[0:a]' + af + '[o]', '-map', '[o]'] if band else ['-af', af]
-    r = subprocess.run(cmd + ['-f', 'null', '-'], capture_output=True, text=True)
-    vals = [float(v) for v in re.findall(r'lavfi\.r128\.M=(-?[\d.]+)', r.stdout)]
+    cmd += ['-filter_complex', '[0:a]' + af + '[o]', '-map', '[o]'] if band else ['-map', '0:a:0', '-af', af]
+    r = subprocess.run(cmd + ['-f', 'null', '-'], check=True, capture_output=True, text=True)
+    vals = [float(v) for v in re.findall(r'lavfi\.r128\.M=([^\s]+)', r.stdout)]
     if not vals:
         raise RuntimeError('ebur128 produced no momentary values for %s: %s' % (path, r.stderr[-200:]))
-    return np.asarray(vals)
+    values = np.asarray(vals)
+    invalid = np.flatnonzero(~np.isfinite(values))
+    if invalid.size:
+        # Some FFmpeg builds emit NaN for digital silence. Preserve the 100 ms
+        # slots only after checking PCM; dropping them shifts every later gate.
+        probe = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a:0',
+                                '-show_entries', 'stream=channels', '-of', 'json', path],
+                               check=True, capture_output=True, text=True)
+        channels = int(json.loads(probe.stdout)['streams'][0]['channels'])
+        decode = ['ffmpeg', '-nostdin', '-v', 'error', '-i', path]
+        decode += (['-filter_complex', '[0:a]' + pre + 'anull[o]', '-map', '[o]']
+                   if band else ['-map', '0:a:0'])
+        pcm = subprocess.run(decode + ['-ar', '48000', '-f', 'f32le', '-'],
+                             check=True, capture_output=True).stdout
+        samples = np.frombuffer(pcm, dtype=np.float32).reshape(-1, channels)
+        for index in invalid:
+            window = samples[max(0, (index - 3) * 4800):(index + 1) * 4800]
+            partial_tail = (index == len(values) - 1 and index * 4800 < len(samples) < (index + 1) * 4800)
+            if (not (np.isnan(values[index]) or values[index] == -np.inf) or not window.size
+                    or (not partial_tail and len(window) != min(index + 1, 4) * 4800)
+                    or not np.isfinite(window).all()
+                    or np.any(np.sqrt(np.mean(window.astype(np.float64) ** 2, axis=0)) > 1e-8)):
+                raise RuntimeError('non-finite loudness on a non-silent window at %.1fs' % (index / 10))
+            values[index] = -120.0
+    return values
 
 
 def frames_in(spans, n: int, total: float) -> np.ndarray:

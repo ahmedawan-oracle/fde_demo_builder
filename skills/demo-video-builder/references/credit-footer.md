@@ -1,4 +1,9 @@
-# The FDE Demo Builder credit — MANDATORY
+# The FDE Demo Builder credit
+
+Creator attribution is enabled by default. An explicit request to omit it takes precedence: v3+ films set
+`creator_credit: false` in `film.json`, and the builder, exports and QA verify the omitted state. For a custom v1/v2
+pipeline, omit the stamping step when requested. Keep source license notices. The rules below describe the enabled
+mode only.
 
 Every video produced with this plugin ends with one small line, centred in the footer of the end screen:
 

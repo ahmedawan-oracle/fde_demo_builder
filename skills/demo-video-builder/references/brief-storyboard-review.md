@@ -19,7 +19,10 @@ Feedback is recorded verbatim under `## Changes from vN`, open items under `## S
 `## Locked`; the version in the frontmatter equals the number of change blocks + 1 and `check` enforces it.
 Revise only the cells named. Build only after the lock (`check` fails without `## Locked`; `--autonomous` waives
 it for a drive-it run, which still posts the same decisions and the sheet). A confirmed sheet is a valid stopping
-point when someone only wanted a storyboard to pitch. Render stays user-gated in both run shapes.
+point when someone only wanted a storyboard to pitch. Render stays user-gated unless the requester explicitly
+delegated end-to-end production. For that run, use `build_film.py --autonomous`, document creative decisions under
+`## Inferred`, and set `qa.json`'s `review_lock` to `off` with the reason; do not invent human sign-off. Required
+authorization, media consent and all technical/evidence gates still apply.
 
 Iteration discipline: one variable per edit; absolute targets ("push lands 0.4 s before the word", never "a bit
 late"); a freeze clause for what already works; strip then re-layer a misfiring scene; the gates verify structure,
@@ -30,7 +33,7 @@ background and batch visual checks at pass boundaries: one sheet beats N single-
 
 Frontmatter, one key per confirmed field: `name, message, audience, destination, aspect, length_s, angle,
 narration (verbatim|restructured), voices, honesty_line, review (with-me|drive-it), storyboard (yes|no),
-placeholders (yes|no), credit` (verbatim "Crafted with FDE Demo Builder · by Ahmed Awan"). Sections: Intent,
+placeholders (yes|no), credit` (default credit verbatim, or `none` with `film.json creator_credit=false`). Sections: Intent,
 **Stated** (what the requester said, where), **Inferred** (defaults with receipts — corrections live here),
 Must-haves, Deferred asks, Assets, Bans, Notes (with the one integration check).
 
@@ -39,6 +42,8 @@ recommended option first with its receipt; the two run-shape questions (storyboa
 last and separately; one integration check for a consequence no single answer showed; a hand-off that shows
 stated and inferred as two groups; a revision to the summary is not a confirmation. A "just build it" signal sets
 `review: drive-it, storyboard: no` and the run still posts decisions with reasons and a sheet.
+For delegated creative direction, fill unanswered creative fields as inferred choices instead of asking each one;
+do not infer authorization or record those choices as requester answers.
 
 `brief.py BRIEF.md` validates (message ≤ 25 words, one sentence, outcome language — no identifiers, table or API
 names, no "Welcome to / Introducing", no banned claim; aspect follows destination; the credit verbatim) and prints

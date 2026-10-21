@@ -1,7 +1,7 @@
 # QA gates — the index (`qa_film.py` + `gates/*.py`)
 
 `qa_film.py` runs its built-in picture and sound checks, then every `gates/*.py` module (`GATE_NAMES` +
-`run(ctx) → [(name, ok, detail)]`), and **CREDIT last — it cannot be disabled**. `--profile picture` is the
+`run(ctx) → [(name, ok, detail)]`), and **CREDIT last — it checks the configured presence or absence**. `--profile picture` is the
 default fast set (12 picture gates: cuts land, blank after cut, freeze, loudness, captions, CREDIT, lint,
 determinism, seams move, zoom budget, contrast, claims traced); `--profile full` runs every module. The
 verdict is printed; `out/qa_report.json` repeats it for the review pack. A broken gate is a failed gate,

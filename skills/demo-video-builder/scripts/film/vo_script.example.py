@@ -13,6 +13,10 @@ VOICES = {
     "assistant": ("en-US-BrianNeural",       "+2%"),   # the product's own voice (+8 % read 3.5 words/s — too fast for the text gate)
 }
 
+# With explicit cloud-TTS approval, a role may instead use OCI Speech while the other roles remain unchanged:
+# "narrator": {"provider": "oci_speech", "voice": "Annabelle", "profile": "DEFAULT",
+#                "language": "en-US", "model": "TTS_2_NATURAL", "tempo": 0.96},
+
 SCENES = {
     "film": {
         "gap": 0.45,

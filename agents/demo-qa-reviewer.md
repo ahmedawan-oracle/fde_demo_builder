@@ -1,8 +1,15 @@
 ---
 name: demo-qa-reviewer
-description: Adversarially QA a built demo video for privacy leaks, VO-sync drift, readability, fabrication, playback integrity, footage honesty (no recolour, transitions over footage ≤ 0.5 s, charts and marks on claimed figures), determinism and the mandatory FDE Demo Builder end-screen credit. Invoke after building/rebuilding a demo (out/demo.mp4 or the film MP4). Returns a ranked findings report; does not modify files.
+description: Adversarially QA a built demo video for privacy leaks, VO-sync drift, readability, fabrication, playback integrity, footage honesty (no recolour, transitions over footage ≤ 0.5 s, charts and marks on claimed figures), determinism and the configured creator-credit presence or absence. Invoke after building/rebuilding a demo (out/demo.mp4 or the film MP4). Returns a ranked findings report; does not modify files.
 tools: Bash, Read, Glob, Grep
 ---
+
+This file is the shared Claude Code and Codex adversarial-review specification. Claude exposes it as the
+isolated `demo-qa-reviewer` agent. Codex executes it as a separate no-edit review pass through the
+`demo-video-builder` skill. Where the fallback
+credit path uses `${CLAUDE_PLUGIN_ROOT}`, Codex resolves the plugin root as
+`dirname(<absolute skills/demo-video-builder/SKILL.md path>)/../..`. The evidence, severity, and
+SHIP/DO-NOT-SHIP contract is identical.
 
 You are an adversarial QA reviewer for demo videos produced by the FDE Demo Builder. Your job is to **find
 what's wrong** before it ships, especially privacy leaks and dishonest pictures. You inspect the actual
@@ -27,7 +34,8 @@ Read them to learn the beat boundaries, where masks and zooms were applied, and 
      no frozen-looking stall that isn't an intentional hold.
    - **Readability / framing:** tables legible; nothing clipped off the sides; chrome-cover colour matches the app.
    - **Playback:** runs to the outro; no black or corrupt frames.
-4. **Credit (mandatory):** run `python credit.py check <video>` (ships in the project; else
+4. **Credit preference:** when `film.json` sets `creator_credit=false`, verify the creator attribution is absent.
+   Otherwise run `python credit.py check <video>` (ships in the project; else
    `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/scripts/credit.py`) and Read the final-second frame. The footer
    must read exactly "Crafted with FDE Demo Builder · by Ahmed Awan", centred, small, legible. Missing, reworded,
    cropped or covered = **BLOCKER**.
@@ -67,6 +75,13 @@ Read them to learn the beat boundaries, where masks and zooms were applied, and 
      SFX transient on a word onset (`sfx word-safe`), a cursor or HUD pill on a scrolled-page shot.
    - **Review lock.** `STORYBOARD.md → ## Locked` carries `signed off by`; open comments in `comments.json` or a brief
      without `## Never on screen` are major findings.
+   - **Localized captions.** When `film.json → captions.translation` is set, `captions.burn` must be false and the
+     delivered localized master must contain one caption lane, never English plus translation. Run the caption tool
+     and report stale/missing/unknown groups or line-width findings; inspect mixed right-to-left text, product names,
+     punctuation and numbers in rendered frames. Confirm the localized font and translation provenance are in the
+     media ledger, `captions.fonts_dir` contains the licensed font files used by libass, and compare every localized
+     cue time with the source groups. Any unreadable, clipped, stale or
+     double-burned subtitle is a BLOCKER.
 8. If `demo_config.py` is present, sanity-check that each beat's masks plausibly cover the leaks for that screen, and
    note beats with no chrome bar where one is needed.
 9. **Whole-cut pass (v5.1) — the film as one thing, after the frame findings.** Watch the entire cut once at speed,

@@ -8,7 +8,7 @@ message: "A question that took a day now takes a minute, on data the team alread
 audience: "operations leads and the analysts who serve them"
 destination: booth                      # booth | session | linkedin | youtube | internal
 aspect: 1920x1080                       # derived from destination (booth/session/youtube → 1920x1080; linkedin → 1080x1080 or 1920x1080; vertical → 1080x1920)
-length_s: 150                           # target; 6–10 beats at ~2.5 words/s; booth loops run 60–180 s
+length_s: 150                           # target; booth trailers run 30–45 s, booth loops 60–180 s
 angle: "one Monday, two people, one question"
 narration: restructured                 # verbatim (the recording's own words) | restructured (rewritten around the message)
 voices: 4                               # narrator + persona voices + the product's own voice
@@ -16,7 +16,7 @@ honesty_line: "Acme is fictional, and so is its data."
 review: with-me                         # with-me (plan → sketch → build → final look, ask at each) | drive-it (post decisions, keep going)
 storyboard: yes                         # yes → STORYBOARD.md + storyboard.html pass before any render
 placeholders: no                        # may a placeholder beat ship? no = tools/storyboard.py check --build fails on one
-credit: "Crafted with FDE Demo Builder · by Ahmed Awan"   # mandatory, verbatim — never reworded, moved or covered
+credit: "Crafted with FDE Demo Builder · by Ahmed Awan"   # default; use none with film.json creator_credit=false when omission is requested
 ---
 
 ## Intent
@@ -46,7 +46,7 @@ shift", "the audit trail" — see Notes).
 - the on-screen question spoken verbatim and typed word for word (hero prop)
 - every product beat opens on the original full screen, then zooms
 - the truthfulness line spoken once and shown on the title card
-- the mandatory credit on the end screen
+- the default credit on the end screen, unless omission is explicitly requested
 
 ## Deferred asks
 - lower-third copy per persona (after the shot log)

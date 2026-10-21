@@ -1,7 +1,8 @@
 # QA checklist
 
-A demo isn't done until an adversarial pass finds nothing. Run `build.py`'s built-in QA, then the
-`demo-qa-reviewer` agent, fix everything, and rebuild. Re-verify after every rebuild.
+A demo isn't done until an adversarial pass finds nothing. Run `build.py`'s built-in QA, then the shared
+reviewer specification: Claude invokes `demo-qa-reviewer`; Codex uses a separate no-edit review pass. Fix
+everything and rebuild. Re-verify after every rebuild.
 
 ## Automated (build.py prints these)
 - **Decode integrity** — `ffmpeg -v error -i out/demo.mp4 -f null -` returns clean (no errors).
@@ -49,8 +50,8 @@ Find issues → fix in `demo_config.py` (spans/masks/vo/zoom/freeze) → `python
 
 `python qa_film.py --profile=picture` runs the 12 picture gates; `--profile=full` runs every plug-in module
 (seams, camera, overlays, audio, lint, canary, golden, text, grade, ledger, leaks, sfx, reveals, charts,
-annotation, skins). The index with every gate and its rule is `qa-gates.md`; the
-`demo-qa-reviewer` agent's v5 blockers are leaks, recoloured or transitioned-over footage, chart values
+annotation, skins). The index with every gate and its rule is `qa-gates.md`. The shared reviewer's v5 blockers
+are leaks, recoloured or transitioned-over footage, chart values
 without a claim, marks off their evidence, and the credit.
 
 ## v3 film gates (`python qa_film.py`)

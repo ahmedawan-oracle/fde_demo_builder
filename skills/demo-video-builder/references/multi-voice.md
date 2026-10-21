@@ -3,6 +3,9 @@
 One voice reads a script; a **cast** tells a story. This reference covers casting, the
 placed-beat method for re-voicing a recording, and the failure modes that actually bite.
 
+The default is a warm two- or three-role cast. A single voice is acceptable only when the brief asks for it or the
+format is too short for a role handoff. Voice changes must mark a story function, not provide random variety.
+
 ## Casting
 
 Two or three voices, each with a *job* — not voices for variety's sake:
@@ -12,6 +15,11 @@ Two or three voices, each with a *job* — not voices for variety's sake:
 | **Narrator** | the problem story, the turns, the close | `en-US-AndrewNeural` `+3%` |
 | **Guide** | the product walkthrough ("here's the screen…") | `en-US-AvaNeural` `+4%` |
 | **Character** | one persona with 1–3 short lines: an operator call, an exec question, a system refusal | `en-US-ChristopherNeural` `+2%` |
+
+Edge TTS remains the zero-OCI-dependency default and sends text to Microsoft. With explicit cloud-TTS approval, OCI Speech
+`TTS_2_NATURAL` can supply natural voices and authoritative word marks; see `oci-speech.md`. Do not silently fall
+back between providers because a voice change alters duration, word timing, pronunciation, and the approved media
+provenance.
 
 Rules that held up across productions:
 
@@ -29,10 +37,11 @@ Rules that held up across productions:
 
 ## Word timestamps (the sync backbone)
 
-`gen_vo_multivoice.py` requests `boundary="WordBoundary"` from edge-tts and saves per-word
-offsets to `vo/<name>_words.json`. Two facts to rely on:
+`gen_vo_multivoice.py` requests `WordBoundary` events from Edge TTS or word speech marks from OCI Speech and saves
+per-word offsets to `vo/<name>_words.json`. Two facts to rely on:
 
-1. **Same text + voice + rate reproduces identical audio and identical word times.** You can
+1. **Same text + voice + speed reproduces stable audio and word times for a locked provider.** Cache and preserve
+   the approved voice files; do not assume two providers or model revisions are interchangeable. You can
    re-render a scene without regenerating VO and nothing drifts.
 2. **Hyphenated phrases are ONE token.** "twenty-three-point-five" arrives as a single word —
    the scene's `wt()` helper strips non-alphanumerics, so look it up as
@@ -61,7 +70,7 @@ to a recording that keeps its original timing, so cursor movement and UI reveals
 
 ## Levels
 
-Don't loudnorm per beat (it pumps). The edge-tts voices sit close enough together; apply one
+Don't loudnorm per beat (it pumps). Level-match the cast within about 2 dB, then apply one
 `loudnorm=I=-16:TP=-1.5:LRA=13` on the **final concatenated mix** and spot-check with
 `volumedetect` at a few points per segment — means within ~2 dB of each other is done.
 The radio filter chain already compensates its own level.

@@ -8,9 +8,9 @@
 const puppeteer = require('puppeteer');
 const { spawn, spawnSync } = require('child_process');
 const path = require('path'); const fs = require('fs');
-function chromePath() {
+async function chromePath() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  try { const p = puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) {}
+  try { const p = await puppeteer.executablePath(); if (fs.existsSync(p)) return p; } catch (e) {}
   return ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 }
 const argvAll = process.argv.slice(2);
@@ -136,9 +136,10 @@ async function renderChunk(browser, k, i0, i1, errs) {
      Measured on the staged-lane scene: 47/54 frames differed between two renders without them, 0/54 with them, same wall
      time (42 s vs 37 s). On by default; RENDER_COMPOSITOR_SYNC=0 disables them. */
   const syncArgs = process.env.RENDER_COMPOSITOR_SYNC === '0' ? [] : ['--run-all-compositor-stages-before-draw', '--disable-checker-imaging', '--disable-threaded-animation', '--disable-image-animation-resync'];
+  const executablePath = await chromePath();
   // protocolTimeout: the first software-GL frame of a scene with a 3D title can take minutes on a loaded laptop; the default
   // 180 s turned a slow first capture into a dead render (v5.1)
-  const launch = sync => puppeteer.launch({ headless: 'new', executablePath: chromePath(), protocolTimeout: 900000,
+  const launch = sync => puppeteer.launch({ headless: 'new', executablePath, protocolTimeout: 900000,
     args: ['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1.5', '--window-size=1280,760', '--font-render-hinting=none', '--disable-lcd-text',
            '--force-color-profile=srgb', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--allow-file-access-from-files']
            .concat(glArgs, sync) }).catch(e => {

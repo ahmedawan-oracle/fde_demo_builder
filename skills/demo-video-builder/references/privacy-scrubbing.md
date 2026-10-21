@@ -65,6 +65,7 @@ After building, sample frames across the whole video and **look**:
 ffmpeg -v error -ss <t> -i out/demo.mp4 -frames:v 1 -q:v 3 out/qa/check_<t>.jpg
 ```
 Check the beginning, middle, and end of every beat, and any moment the UI scrolls or a field gets focus.
-The `demo-qa-reviewer` agent automates this sweep; for films, `python qa_film.py` runs the leak gate and
+The shared reviewer specification automates this sweep (Claude agent; Codex separate no-edit pass); for films,
+`python qa_film.py` runs the leak gate and
 `python gates/leak_gate.py --scan frame.png` checks any grab before you extract from it. Re-verify after every
 rebuild — masks are in native coordinates and a framing change can shift what's visible.

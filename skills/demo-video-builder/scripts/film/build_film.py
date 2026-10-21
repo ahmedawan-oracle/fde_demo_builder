@@ -35,6 +35,8 @@
 film.json keys added in v5 (every one opt-in; a v4 film.json builds exactly as before):
     "skin": "skins/harbor.json", "skin_design": true, "skin_strict": false
     "captions": {..., "ass": true, "overrides": "captions_overrides.json"}
+    "captions": {..., "burn": false, "translation": "captions_ar.json", "fonts_dir": "assets/fonts"}
+    # use exports:["burn_ass"] for the localized master
     "chapters": true | {"merge": "auto"|true|false, "min": 10, "max_title": 40, "snap": 0.75}
     "sfx": {"auto": true, "sync": "sync.json", "db": -14, "guard": 0.15, "nudge": 0.12, "dir": "audio/sfx"}
     "fx": {"buses": {"voice": {"preset": "voice-booth"}, "bed": {"preset": "bed-under-voice"}, "sfx": {"preset": "sfx-tight"}}}
@@ -45,7 +47,7 @@ the carved bed. Templates with everything switched on: templates/films/<booth-tr
 
 The narration is the clock: the total length comes from vo/<name>_phases.json, so picture and sound cannot drift.
 """
-import json, os, re, subprocess, sys
+import json, math, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 C = json.load(open(os.path.join(HERE, 'film.json'), encoding='utf-8'))
@@ -68,7 +70,12 @@ SFX_CFG = C.get('sfx')
 SFX = os.path.join(HERE, SFX_CFG) if isinstance(SFX_CFG, str) and SFX_CFG else None      # v4: a hand-made stem; v5 dict → sfx_auto()
 SFX_DB = float(C.get('sfx_db', -5.0))
 BED_DB = float(C.get('bed_db', -12.0))             # v4 default -12 (was -9): the pan upmix restores 3 dB of voice
-LUFS_I, LUFS_TP, LUFS_LRA = -16.0, -1.5, 11.0
+LRA_CONFIG = C.get('loudness_range', 11.0)
+if LRA_CONFIG is None or isinstance(LRA_CONFIG, bool):
+    raise ValueError('loudness_range must be a number, not null or a boolean')
+LUFS_I, LUFS_TP, LUFS_LRA = -16.0, -1.5, float(LRA_CONFIG)
+if not math.isfinite(LUFS_LRA) or not 1 <= LUFS_LRA <= 50:
+    raise ValueError('loudness_range must be finite and between 1 and 50 LU')
 LIMITER_LATENCY_S = 239 / 48000.0                   # alimiter attack=5 ms look-ahead = 239 samples of delay at 48 kHz (v5.1, measured)
 TAIL = 3.6                                          # music/room tail after the last word (TAIL_S): the closing card HOLDS while the credit lands —
                                                     # credit.py's 4 s window starts at END + TAIL - 4 = END - 0.4, after the lockup's rule has finished
@@ -200,6 +207,25 @@ def plan():
     if have('export_timeline.js'):
         run(['node', os.path.join(HERE, 'export_timeline.js'), TIMING_DATA, SHOTS_JS], cwd=HERE)
     cap = C.get('captions') or {}
+    translation = cap.get('translation')
+    if translation:
+        if cap.get('burn') is not False:
+            raise SystemExit('REFUSING: localized captions require captions.burn=false; otherwise English and localized captions overlap')
+        if cap.get('overrides'):
+            raise SystemExit('REFUSING: captions.translation and captions.overrides are mutually exclusive')
+        if not cap.get('ass'):
+            raise SystemExit('REFUSING: captions.translation requires captions.ass=true')
+        if not have(translation):
+            raise SystemExit('REFUSING: captions.translation file is missing: %s' % translation)
+        fonts_dir = cap.get('fonts_dir')
+        if not fonts_dir or not os.path.isdir(os.path.join(HERE, fonts_dir)):
+            raise SystemExit('REFUSING: localized captions require captions.fonts_dir with local licensed font files')
+        font_files = [name for name in os.listdir(os.path.join(HERE, fonts_dir)) if name.lower().endswith(('.ttf', '.otf', '.ttc'))]
+        if not font_files:
+            raise SystemExit('REFUSING: captions.fonts_dir contains no .ttf, .otf or .ttc files')
+        for required in (cap.get('config'), os.path.join('scenes', 'lib', 'captions.js'), os.path.join('tools', 'captions_ass.py')):
+            if not required or not have(required):
+                raise SystemExit('REFUSING: localized captions require %s' % (required or 'captions.config'))
     if cap.get('config') and have(cap['config']) and have('scenes', 'lib', 'captions.js'):
         def captions_cmd(with_luma):
             cmd = ['node', os.path.join(HERE, 'scenes', 'lib', 'captions.js'), TIMING_DATA, os.path.join(HERE, cap['config']),
@@ -515,13 +541,30 @@ def tool_versions():
     return ver(['ffmpeg', '-version'], r'ffmpeg version (\S+)'), ver(['node', '--version'], r'v?(\S+)')
 
 
+def video_frames(path):
+    result = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-count_frames',
+                             '-show_entries', 'stream=nb_read_frames', '-of', 'json', path],
+                            check=True, capture_output=True, text=True)
+    frames = int(json.loads(result.stdout)['streams'][0]['nb_read_frames'])
+    if frames <= 0:
+        raise ValueError('Video has no decoded frames: ' + path)
+    return frames
+
+
 def mux():
     print('[4/7] mux')
     ffv, nodev = tool_versions()
+    provenance = 'ffmpeg %s · node %s · %d fps' % (ffv, nodev, FPS)
+    if C.get('creator_credit', True) is not False:
+        provenance = 'FDE Demo Builder 5 · ' + provenance
+    expected_frames = video_frames(SEG)
+    # AAC packet rounding with -shortest can discard the last video frame.
     run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', SEG, '-i', MASTER, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy',
-         '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2', '-shortest',
-         '-metadata', 'comment=FDE Demo Builder 5 · ffmpeg %s · node %s · %d fps' % (ffv, nodev, FPS),
+         '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2', '-t', '%.6f' % (TOTAL + TAIL),
+         '-metadata', 'comment=' + provenance,
          '-movflags', '+faststart', PRE])
+    if video_frames(PRE) != expected_frames:
+        raise SystemExit('REFUSING: mux changed the rendered video frame count.')
 
 
 # ---------------------------------------------------------------- 5. captions
@@ -536,13 +579,20 @@ def captions():
         if cap.get('vtt'):
             cmd += ['--vtt', os.path.splitext(FILM)[0] + '.vtt']
         ov = cap.get('overrides')
+        translation = cap.get('translation')
         if ov and have(ov):
             cmd += ['--overrides', os.path.join(HERE, ov)]
+        if translation:
+            cmd += ['--translations', os.path.join(HERE, translation)]
         rc = subprocess.run(cmd, cwd=HERE).returncode
         if rc == 2:
             raise SystemExit('REFUSING: tools/captions_ass.py could not read out/caption_groups.json')
+        if rc and translation:
+            raise SystemExit('REFUSING: localized caption validation failed; no localized master was exported')
         if rc:
-            print('      WARN  captions_ass findings above (overrides) — the sidecars were still written')
+            print('      WARN  captions_ass findings above — the sidecars were still written')
+        if translation and (not os.path.exists(ass) or not os.path.exists(SRT)):
+            raise SystemExit('REFUSING: localized caption sidecars were not written')
         return
     if os.path.exists(gp) and have('tools', 'captions_srt.py'):
         cmd = [sys.executable, os.path.join(HERE, 'tools', 'captions_srt.py'), gp, SRT]
@@ -564,10 +614,15 @@ def captions():
 
 # ---------------------------------------------------------------- 6. credit (mandatory)
 def credit():
+    if C.get('creator_credit', True) is False:
+        os.replace(PRE, FILM)
+        return
     print('[6/7] credit (mandatory)')
     sys.path.insert(0, HERE)
     import credit as CR
     CR.stamp(PRE, FILM)
+    if video_frames(FILM) != video_frames(SEG):
+        raise SystemExit('REFUSING: credit stamping changed the rendered video frame count.')
     if not CR.check(FILM):
         raise SystemExit('REFUSING: the FDE Demo Builder credit is not legible on the end screen.')
     os.remove(PRE)

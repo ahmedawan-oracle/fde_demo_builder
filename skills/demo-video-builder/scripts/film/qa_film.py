@@ -201,7 +201,10 @@ if mods:
             gate(mname, False, 'gate crashed: %s: %s' % (type(e).__name__, str(e)[:160]))
 
 import credit as CR
-gate('CREDIT', CR.check(FILM, verbose=False), '"%s" on the end screen (mandatory)' % CR.CREDIT_TEXT)
+if C.get('creator_credit', True) is False:
+    gate('CREDIT', not CR.check(FILM, verbose=False), 'Creator attribution omitted per film configuration')
+else:
+    gate('CREDIT', CR.check(FILM, verbose=False), '"%s" on the end screen (default)' % CR.CREDIT_TEXT)
 
 try:
     os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)

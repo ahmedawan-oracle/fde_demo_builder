@@ -1,0 +1,18 @@
+[
+  {
+    "name": "demo",
+    "kind": "seq",
+    "shows": "REAL: the product question is sent and the answer arrives",
+    "t0": 15.05,
+    "t1": 16.8,
+    "crop": [0, 0, 1920, 1080]
+  },
+  {
+    "name": "answer",
+    "kind": "still",
+    "shows": "the answer card holding its one figure",
+    "win": [17.4, 18.0],
+    "n": 3,
+    "crop": [0, 0, 1920, 1080]
+  }
+]

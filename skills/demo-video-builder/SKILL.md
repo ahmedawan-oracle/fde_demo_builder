@@ -1,6 +1,6 @@
 ---
 name: demo-video-builder
-description: Use when building a polished, voice-narrated demo video from a screen recording — turning a raw capture of a product demo into a shareable MP4 with cut lag, scrubbed privacy leaks, synced VO, optional animated opener/outro. v2 adds cinematic "story rebuilds" — animated b-roll acts word-synced to a multi-voice cast. v3 adds production films — real-pixel footage (original full screen → zoom, real scrolls and typing), the narration as the clock, deterministic frame-by-frame render, linear-loudness mastering, QA gates. v4 adds production craft — velocity-matched seams, camera kit, caption lane, carved audio, lint + determinism canary, storyboard review, blocks, media ledger, honest finishing. v5 is the picture layer — GSAP timelines on the clock, kinetic type, WebGL transitions, 3D titles, story blocks, light / depth / annotation / glass, reveals, a redrawn cursor and camera from telemetry, idle detection, an OCR leak gate, karaoke captions, staging and vertical reflow, brand kits + ten skins, a live studio, a review pack, synthesized SFX — on software GL, with the mandatory FDE Demo Builder end-screen credit. Triggers on "build a demo video", "narrate this recording", "make a demo from this screen capture", "cut the thinking lags and add voiceover", "add a wow animated opener", "multi voice demo", "b-roll story animation", "booth trailer", "make this look like a product film", "kinetic titles", "karaoke captions", "vertical cut".
+description: Build or QA polished, voice-narrated demo videos from screen recordings. Use for "build a demo video", "narrate this recording", "make a demo from this screen capture", cutting thinking lag, privacy scrubbing, synced voiceover, "add a wow animated opener", "multi voice demo", "b-roll story animation", customer proof films, localized subtitles, booth trailers, production films, kinetic titles, karaoke captions, sound design, transitions, and vertical cuts. Covers real-pixel footage, narration-clock timing, deterministic rendering, mastering, review gates, and the brief's creator-credit preference. Also use to scaffold v1 demos, v2 story rebuilds, or v5 production films.
 ---
 
 # Demo Video Builder
@@ -8,14 +8,15 @@ description: Use when building a polished, voice-narrated demo video from a scre
 Turn one screen recording into a polished, narrated, privacy-clean demo video — **fully scripted**, no
 video editor.
 
-## MANDATORY: the end-screen credit
+## End-screen credit preference
 
-Every video made with this plugin — v1, v2, v3, v4, v5, cut-downs and re-exports — ends with one small line,
+By default, videos made with this plugin — v1, v2, v3, v4, v5, cut-downs and re-exports — end with one small line,
 centred in the footer of the end screen: **"Crafted with FDE Demo Builder · by Ahmed Awan"**. `credit.py`
 stamps it (last 4 s, fade-in, auto light/dark) and verifies it; `build.py`, `assemble.example.sh` and
 `build_film.py` call it as their final step, `qa_film.py` and the `demo-qa-reviewer` agent fail a video
-without it. Never skip, reword, restyle, move or cover it; custom pipelines must call `python credit.py stamp`
-on the final file. → `references/credit-footer.md`
+without it in the default mode. Honor an explicit request to omit creator attribution by setting
+`"creator_credit": false` in `film.json`; the builder omits it and QA verifies its absence. Preserve license notices
+in source packages regardless of the film preference. → `references/credit-footer.md`
 
 ## Operating principles (read first)
 
@@ -30,10 +31,30 @@ on the final file. → `references/credit-footer.md`
   reads the pixels, not your intentions. → `references/privacy-scrubbing.md`, `references/privacy-leak-gate.md`
 - **One clock.** Narration word times drive every cut, move, caption and sound (`wt(phase, word)`); every
   visual is a pure function of `t`; two renders are byte-identical.
+- **Cast, do not announce.** Default to two or three warm, role-based presenters: narrator for the stakes and
+  turns, guide for product proof, and at most one short customer or industry-operator persona. A single undifferentiated TTS voice is a
+  deliberate exception, not the production default. Edge TTS remains supported as a cloud provider; approved OCI Speech
+  `TTS_2_NATURAL` is available through the same multi-voice generator. → `references/multi-voice.md`,
+  `references/oci-speech.md`
+- **Warm energy, not rushing.** Audition engaged, conversational takes with purposeful emphasis and natural
+  pauses. Aim for 150-160 wpm when the brief allows; shorten lines rather than increasing loudness or forcing
+  speed to meet a beat. Reusing verified takes with modest tempo changes still requires retiming captions and
+  checking the final mixed speech, handoffs and intelligibility.
+- **Verify audible words.** OCI narration must pass actual-audio transcription before accepting a take. Plausible
+  provider speech marks, valid codecs and correct levels can coexist with garbled synthesis. Check the final mixed
+  speech against the script too; regenerate failed takes.
+- **Clicks are evidence.** Preserve real click telemetry or reconstruct only the recorded pointer path with
+  `CURSOR`; show a restrained ring and press response on meaningful actions. Never decorate a screen with clicks that
+  did not occur. → `references/recording-native.md`
+- **Stable camera.** Render camera movement from the film clock with subpixel transforms. Establish, push, hold,
+  and pull or match into the next shot; integer crop stepping, oscillating drift and low-rate screenshot upsampling
+  are blockers. → `references/cinematic-grammar.md`, `references/motion-scans.md`
 - **Cut the dead air.** Spinners, loads and idle hands are the difference between a slog and a tight film.
 - **One source of truth** per workflow (`demo_config.py`, `vo_script.py` + `STORYBOARD.md` + the ledgers).
   Change the source, re-run — never hand-edit intermediate files.
 - **QA until clean.** A demo is done when the gates pass and the adversarial reviewer finds nothing.
+- **Rebuilds preserve evidence.** Reuse dated captures honestly; retain accepted takes and hash-bound QA. For
+  recorded-screen holds, privacy false positives and authorized cleanup, see [story-film-recipe.md](references/story-film-recipe.md#rebuild-and-retention).
 
 ## v1 — Polish one recording (7 phases)
 
@@ -41,16 +62,19 @@ on the final file. → `references/credit-footer.md`
 (chrome bar, time-gated masks). → `references/privacy-scrubbing.md` 4. **Frame & zoom** (native scale, gentle
 push-in). → `references/framing-and-zoom.md` 5. **Voiceover** per beat with edge-tts. 6. **Assemble & sync**
 (`build.py` time-fits footage to VO). → `references/voiceover-and-sync.md` 7. **QA** → `references/qa-checklist.md`.
-Scaffold with `/fde-demo-builder:new-demo <name>`; `gen_vo.py` → `build.py` → `out/demo.mp4`. Pitfalls:
-`references/ffmpeg-gotchas.md`.
+For v1 scaffolding, Claude invokes `/fde-demo-builder:new-demo <name>`. Codex reads and follows
+[`commands/new-demo.md`](../../commands/new-demo.md) from a natural-language request. If a client reads the file
+directly, its preamble defines placeholder substitution.
+Then `gen_vo.py` → `build.py` → `out/demo.mp4`. Pitfalls: `references/ffmpeg-gotchas.md`.
 
 ## v2 — Story rebuilds: b-roll acts + a multi-voice cast
 
-Review the source (frames + transcript) → write `vo_script.py` (2–3 voices, SCENES + PLACED beats) →
+Review the source (frames + transcript) → write `vo_script.py` (2–3 warm role-based voices, SCENES + PLACED beats) →
 `gen_vo_multivoice.py` (word timestamps) → clock-driven b-roll scenes (`frame(t)`, `wt()`, flakes, Ken Burns)
 QA'd with `shot.js` and rendered with `render_scene.js` → `assemble.sh`. B-roll is clearly stylised and
-fictional; recorded segments are real screens only. → `references/broll-scenes.md`, `references/multi-voice.md`,
-`/fde-demo-builder:new-broll`.
+fictional; recorded segments are real screens only. → `references/broll-scenes.md`, `references/multi-voice.md`.
+For v2 scaffolding, Claude invokes `/fde-demo-builder:new-broll`. Codex reads and follows
+[`commands/new-broll.md`](../../commands/new-broll.md); the same Markdown defines the workflow.
 
 ## v3 — Production films: real pixels on the narration clock
 
@@ -60,6 +84,20 @@ original screen first then the zoom (`establish`, `FOOT.fullscreen`), real scrol
 it is spoken → `render_frames.js` (frame-by-frame, N workers, frame 0 = clock 0) → `build_film.py` (carved
 bed, two-pass linear loudnorm to −16 LUFS, captions, **credit**) → `qa_film.py`. → `references/real-pixel-footage.md`,
 `deterministic-render.md`, `cinematic-grammar.md`, `honesty-audit.md`, `audio-mix.md`.
+
+### Customer proof treatment
+
+For a cinematic or "wow" story with b-roll, kinetic data and an outcome arc, read
+[`references/story-film-recipe.md`](references/story-film-recipe.md). It adapts the existing production scaffold
+to customer or generic industry stories without forcing the calm customer-story template or recreating live proof.
+Use the requested duration, one claims ledger and word-timed motion; verify a short pilot before the full render.
+
+For a calm prospect-specific film or generic industry use case, use the `customer-story` scaffold and
+[`references/customer-proof-film.md`](references/customer-proof-film.md): measure a supplied reference for craft,
+build a short customer or industry-world and data-to-agent setup, then spend the majority of the film on connected real product
+proof. The same reference defines optional reviewed localized captions from the narration's existing cue windows.
+The template name is historical: no customer name or branding is required. Accept free-form briefs, use an
+industry/use-case title and project slug when no customer is named, and never invent a customer identity.
 
 ## v4 — Production craft
 
@@ -96,7 +134,7 @@ d3-delaunay`), and never touches a product pixel. Gates are footnotes: the devic
 | A reel, not a deck: a grid of days that rises as iso cubes and lands back on the flat grid; two accent panels that slam shut and split onto the title; a pixel-matrix wipe at the big cuts; light-speed bursts and ripple rings on the payoff word; a glossy liquid core that drinks every arriving artifact; outline marquees, smear trails, a film HUD with chapters and timecode | `REEL.voxel` · `view` · `slam` · `stinger` · `streaks` · `rings` · `blob` · `marquee` · `smear` · `hud` · `decode` | `lib/reel.js` (no GSAP; `scenes_reel_demo.html`) | `showreel-motion.md` |
 | Charts whose every value is a claim; a before/after split, wipe or picture-in-picture where both halves are the recording's own pixels | `CHART.bars` · `line` · `kpiTiles` · `race` · `donut` ⁷ · `COMPARE.split` · `wipe` · `pip` | `lib/charts.js`, `lib/compare.js` | `story-blocks.md` |
 | The screen in a frame (wallpaper, padding, neutral title bar) and a vertical or square cut that follows the cursor like an operator | `STAGE.mount` · `stage.pose` · `STAGE.reflow` → `export.py --reflow` | `lib/stage.js` | `staging-and-reflow.md` |
-| The spoken word lighting up in the caption; a word waterfall on recreated lines; the same timing in the burn-in, the .srt/.vtt and an .ass with per-word tags; chapters that start on cuts | `karaoke` · `kinetic` styles · `captions_ass.py` · `chapters.py` ⁸ | `lib/captions.js`, `tools/` | `captions-karaoke-chapters.md` |
+| The spoken word lighting up in the caption; a word waterfall on recreated lines; reviewed localized cues; the same timing in the burn-in, the .srt/.vtt and an .ass; chapters that start on cuts | `karaoke` · `kinetic` styles · `captions_ass.py --translations` · `chapters.py` ⁸ | `lib/captions.js`, `tools/` | `captions-karaoke-chapters.md`, `customer-proof-film.md` |
 | Nothing private: every extracted frame OCR'd for e-mails, identifiers, URLs, tokens, phone numbers, denylisted names and account badges; a blur proposal with a measured radius | `leak_gate.py` · `mask_propose.py --verify --apply` ⁹ | `gates/`, `tools/` | `privacy-leak-gate.md` |
 | A look approved before the build: a logo → a contrast-checked skin + a six-frame style sheet; ten shipped skins with motion profiles and caption styles | `brand_kit.py extract · compose · check` · `skins/*.json` · `skin_apply.py` ¹⁰ | `tools/`, `skins/` | `brand-kits-and-skins.md` |
 | Any frame in under a second, hot reload at the same t, a 1920x1080 tap through the real renderer; one offline review page with honesty flags, per-beat comments and the storyboard sign-off | `studio.py` (T tap, Q lint) · `review_pack.py build · --serve · --lock` ¹¹ | `tools/`, `studio/` | `review-pack-and-studio.md` |
@@ -148,7 +186,7 @@ d3-delaunay`), and never touches a product pixel. Gates are footnotes: the devic
 | footage | Every product frame comes from the recording; a redrawn one is a fabrication. | Median stills, stitched pages in the app's own chrome, real 30 fps seqs, small soft blurs for privacy, the original full screen before any zoom. | what to show, what to blur, where to push |
 | scene | Every visual is a pure function of t, or two renders differ. | No wall clock, no CSS transitions, no unseeded random, no will-change; libraries from node_modules by relative path; devices by moment, gates as footnotes. | which device carries each moment |
 | build | A render that cannot be reproduced cannot be reviewed. | Software GL, compositor settle, exact CFR join, the capture-probe fallback when Chrome hangs; every build is a take with its wall time, scene hash and gates. | the take to keep |
-| qa | A broken gate is a failed gate, never a skipped one. | qa_film.py runs the picture and sound checks and every gates/*.py module; measure a failing gate before loosening it; CREDIT is last and cannot be disabled. | which WARNs to act on |
+| qa | A broken gate is a failed gate, never a skipped one. | qa_film.py runs the picture and sound checks and every gates/*.py module; measure a failing gate before loosening it; CREDIT is last and enforces the explicit creator-credit preference. | which WARNs to act on |
 | pairs | A cut is the end frame of one shot meeting the start frame of the next; approve those two stills first. | snapshot.py --pairs, the review pack's Approve start / Approve end, pair_gate on anchors, words and names. | every START and END approval |
 | review | Reviewers open attachments, not repos. | One offline HTML with the frames, the claims, the gates, the honesty flags and a comment box per beat; served locally, same-origin writes only; --lock writes the sign-off. | the sign-off, every open comment |
 | notes | A reviewer proposes; the editor decides and says why. | Whole-cut notes snap to the nearest edit boundary and carry accepted / rejected with a reason; rejections are kept and shipped in DELIVERY.md. | every accept / reject and its reason |
@@ -158,7 +196,7 @@ d3-delaunay`), and never touches a product pixel. Gates are footnotes: the devic
 preflight (doctor, lint, camera ladder, storyboard lock, canary) → render (software GL, compositor sync,
 first-frame settle) → mix (carve, SFX stem, bus chains, bed envelope) → master → captions (.srt/.vtt/.ass) →
 **credit** → ledger → exports (incl. reflow) → storyboard truth pass. `qa_film.py --profile picture` is the
-fast set; `full` runs every module; CREDIT is last and cannot be disabled. The scene loads only the libs it
+fast set; `full` runs every module; CREDIT is last and enforces the explicit creator-credit preference. The scene loads only the libs it
 uses; overlays, marks, glass and captions live in screen space outside `#camera`; nothing may filter the lane.
 
 **Working rules (v5).** Write `seams.json` before the shots; 2–3 techniques per film, one `gl` accent per act
@@ -176,5 +214,11 @@ the export. Everything the scene loads is a local file.
 sketch sheet (`--mobile` for a phone) → lock → cut list (`cutlist.py` for the footage windows) → build → QA (incl.
 `hold_gate`, `look_gate`) → `snapshot.py --pairs` → `pair_gate` → review pack (approve END frames, comments) → whole-cut notes decided
 (`review_notes.py`) → sign-off → `takes.py prune --after-lock` → export (`--closure hardcut` for a loop; DELIVERY.md carries
-the notes table). A change after that is a `cutlist.py bump` and an `identity_gate` pass. `/fde-demo-builder:new-film <name>` walks it; the fictional
-Acme sample (`make_sample_recording.py`) runs end to end and passes every gate.
+the notes table). A change after that is a `cutlist.py bump` and an `identity_gate` pass. For production-film
+scaffolding, Claude invokes `/fde-demo-builder:new-film <name>`. Codex reads and follows
+[`commands/new-film.md`](../../commands/new-film.md); the same Markdown defines the workflow. The fictional Acme sample
+(`make_sample_recording.py`) runs end to end and passes every gate.
+
+For a final adversarial review, Claude must invoke the isolated `demo-qa-reviewer` agent. Codex reads
+[`agents/demo-qa-reviewer.md`](../../agents/demo-qa-reviewer.md) in a separate no-edit review pass (use an
+independent subagent when available). Both return the same evidence-backed ranked verdict contract.

@@ -1,5 +1,42 @@
 # Changelog
 
+## 5.2.6 - Production rebuild reliability
+
+- Preserve digital-silence loudness time slots with per-channel PCM verification; measurement failures still fail.
+- Preserve the last muxed video frame and honor explicit credit omission in container comments as well as picture.
+- Allow a validated mastering LRA target for short pilots, retaining the existing default and linear-master gate.
+- Add shared rebuild guidance for dated real evidence, role-based voice/motivated sound, privacy review and retention.
+- Regression tests cover silence, anti-phase audio, invalid PCM, band filtering, credit defaults and an actual FFmpeg mux.
+
+## 5.2.5 - Kinetic story treatment
+
+- Preserve custom OCI config paths in narration and allow an explicit local ASR model path for pinned/offline checks.
+
+- Add a shared story-film recipe for customer and generic industry films using the existing renderer and motion libraries.
+- Tie visual emphasis to narration, use one evidence ledger, and adapt duration, casting and motion to the brief.
+- Distinguish calm and cinematic treatments; require a representative pilot and project render preflight.
+- Keep recreated explanatory art separate from real product proof and honor the requested creator-credit setting.
+
+## 5.2.4 - Flexible use-case briefs and energetic narration
+
+- Support customer-specific and generic industry demos from structured or prose-only briefs, without mandatory branding.
+- Specify warm, engaged narration, modest pacing and final-mix verification after any tempo change.
+- Preserve Claude commands, Codex Markdown routing, shared rendering and existing timing/privacy gates.
+
+## 5.2.3 - Verified narration and optional attribution
+
+- Verify OCI Speech's audible output using transcription; retry garbled takes rather than trusting speech marks.
+- Honor an explicit no-creator-credit brief while preserving source license notices.
+- Synchronize voice handoffs, smooth camera guidance, and real-click evidence across both runtimes.
+
+## 5.2.1 — Claude Code and Codex parity
+
+- Added a Codex plugin manifest over the same `demo-video-builder` skill used by Claude Code.
+- Made the existing command and QA-agent Markdown the shared runtime specifications, with explicit placeholder handling.
+- Preserved Claude slash commands and isolated QA-agent behavior while adding Codex natural-language routing.
+- Added a shared customer-proof-film treatment and deterministic localized ASS/SRT/VTT captions, including RTL font,
+  provenance, timing, and review guidance.
+
 ## 5.2.0 — Showreel motion (`lib/reel.js`)
 
 For pitch films and team reels: the grammar of a motion-design reel on the recreated layer, as nine pure functions

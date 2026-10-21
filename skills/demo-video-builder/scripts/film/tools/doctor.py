@@ -16,7 +16,8 @@ Checks (minimum versions are the ones the render path has been verified on):
     'cannot start'); major >= 6; libx264 + aac encoders; filters loudnorm, sidechaincompress, alimiter,
     acrossover, lut3d, psnr (FFMPEG_PATH / FFPROBE_PATH env overrides are honoured; a configured path that does
     not exist is a FAIL)
-  node >= 18; `require('puppeteer')` resolved from the project dir upward (and NODE_PATH) — prints where
+  node >= 18; `require('puppeteer')` resolved from the project dir upward (and NODE_PATH) — prints where;
+    gsap / three / d3-delaunay must exist in the project's own node_modules because the browser loads relative files
   Chrome: PUPPETEER_EXECUTABLE_PATH -> puppeteer.executablePath() -> Program Files (the same order as
     render_frames.js), then a `--version` launch probe (5 s); Windows exit 3221225595 / 0xC0000409 means
     STATUS_STACK_BUFFER_OVERRUN -> point PUPPETEER_EXECUTABLE_PATH at the system Chrome
@@ -117,19 +118,20 @@ class Doctor(object):
             self.add('node', False, out, 'install Node 18+ (https://nodejs.org)'); return None
         major = int(re.sub(r'\D', '', out.split('.')[0]) or 0)
         self.add('node', major >= 18, out.strip(), 'Node 18 or newer')
-        probe = ("try{const p=require.resolve('puppeteer');const pp=require('puppeteer');let ex='';try{ex=pp.executablePath()}catch(e){ex=''}"
-                 "console.log(JSON.stringify({p,ex}))}catch(e){console.log(JSON.stringify({err:e.message.split('\\n')[0]}))}")
+        probe = ("(async()=>{try{const p=require.resolve('puppeteer');const pp=require('puppeteer');let ex='';"
+                 "try{ex=await pp.executablePath()}catch(e){ex=''}console.log(JSON.stringify({p,ex}))}"
+                 "catch(e){console.log(JSON.stringify({err:e.message.split('\\n')[0]}))}})()")
         code, out = _run(['node', '-e', probe], timeout=20, cwd=self.project)
         try:
             info = json.loads(out.strip().splitlines()[-1])
         except Exception:
             info = {'err': out.strip()[:120]}
         if info.get('err'):
-            self.add('puppeteer', False, info['err'][:120], 'npm i puppeteer in the project or a parent folder (or set NODE_PATH)'); return None
+            self.add('puppeteer', False, info['err'][:120], 'cd into the film project and run npm install --prefix . puppeteer'); return None
         self.add('puppeteer', True, 'resolved from ' + info['p'])
-        # the picture libraries a v5 scene loads from node_modules by relative path (lib/motion.js needs gsap;
-        # lib/title3d.js needs three + d3-delaunay). Missing ones are a warning: a film without those libs still builds.
-        probe = ("const r={};for(const m of ['gsap','three','d3-delaunay']){try{r[m]=require.resolve(m)}catch(e){r[m]=''}}console.log(JSON.stringify(r))")
+        # Browser scenes use ../node_modules/<package> from scenes/film.html. Node's normal upward resolution can pass
+        # while that file: URL still 404s, so require the project's physical node_modules here.
+        probe = ("const p=require('path'),r={};for(const m of ['gsap','three','d3-delaunay']){try{r[m]=require.resolve(p.resolve('node_modules',m))}catch(e){r[m]=''}}console.log(JSON.stringify(r))")
         code, out = _run(['node', '-e', probe], timeout=20, cwd=self.project)
         try:
             libs = json.loads(out.strip().splitlines()[-1])
@@ -137,7 +139,7 @@ class Doctor(object):
             libs = {}
         missing = [m for m in ('gsap', 'three', 'd3-delaunay') if not libs.get(m)]
         self.add('node libs', not missing, ('all of gsap, three, d3-delaunay resolve' if not missing else 'missing: ' + ', '.join(missing)),
-                 'npm i gsap three d3-delaunay in the project (scenes load them from node_modules — never a CDN)' if missing else '', level='warn' if missing else None)
+                 'cd into the film project and run npm install --prefix . gsap three d3-delaunay (parent/hoisted modules are not visible to file: scenes)' if missing else '')
         return info.get('ex') or ''
 
     def chrome(self, bundled):

@@ -30,7 +30,7 @@ The `calm` profile forbids rack focus and keeps every entry at 0.6 s; the gates 
 
 ## Using it
 
-`/new-film <name> --template customer-story` copies these six files over the base scaffold. Then:
+`/new-film <name> --template customer-story` applies its planning files over the base scaffold. Then:
 
 ```
 python tools/skin_apply.py skins/paper.json
@@ -41,3 +41,5 @@ python tools/storyboard.py check STORYBOARD.md
 Studio taps for the review pack: `out/taps/NN_<label>.jpg`. Everything here is fictional (Acme, synthetic data); a real
 customer's data appears only with their approval, and the honesty line changes to say so. The credit line is never
 reworded or moved.
+This is a planning skeleton. Adapt `vo_script.py` and `scenes/shots.js` to its phase and visual vocabulary before
+rendering; the untemplated scaffold is the out-of-box Acme render sample.

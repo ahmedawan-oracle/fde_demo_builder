@@ -11,6 +11,7 @@ scipy>=1.11          # audio/sfx_synth.py + fx_chain.py filters, tools/cursor_tr
 
 # Also required on PATH (not pip):
 #   ffmpeg + ffprobe  (>= 6)
+# Optional OCI Speech provider: OCI CLI plus faster-whisper for rendered-audio verification.
 # For animated opener/outro (optional), install with npm in the project folder:
 #   npm i puppeteer puppeteer-screen-recorder
 # v3 films render deterministically with puppeteer only:

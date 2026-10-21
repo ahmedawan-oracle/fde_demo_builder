@@ -15,7 +15,7 @@ A brief is YAML frontmatter (one key per confirmed field) plus prose sections: I
 Deferred asks, Assets, Bans, Notes (templates/BRIEF.example.md). The question protocol it encodes:
 one field per message, recommended option first with its receipt, inference is not an answer, the two run-shape
 questions (review with-me|drive-it, storyboard yes|no) last, one integration check, stated and inferred shown as two
-groups, and a revision to the summary is not a confirmation. Render stays user-gated in both run shapes.
+groups, and a revision to the summary is not a confirmation. Render stays user-gated unless end-to-end production was explicitly delegated.
 Stdlib only; never raises on a malformed brief — it reports.
 """
 import json, os, re, sys
@@ -25,11 +25,11 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES = os.path.normpath(os.path.join(HERE, '..', 'templates'))
-CREDIT = 'Crafted with FDE Demo Builder · by Ahmed Awan'           # mandatory, verbatim (credit.py stamps and checks it)
+CREDIT = 'Crafted with FDE Demo Builder · by Ahmed Awan'           # default, verbatim when enabled (credit.py stamps and checks it)
 
 DESTINATIONS = {
     #  name       aspects accepted (first = derived default)   length_s range   receipt
-    'booth':    (['1920x1080'], (60, 180), 'a booth loop is glanced at from 2–4 m: biggest type, 1–3 min'),
+    'booth':    (['1920x1080'], (30, 180), 'a booth film is glanced at from 2–4 m: biggest type, 30 s trailer to 3 min loop'),
     'session':  (['1920x1080'], (120, 240), 'a session clip plays once on a projector with a speaker beside it'),
     'linkedin': (['1080x1080', '1920x1080'], (30, 90), 'a feed fights for its first second and plays small: ×1.5 type, under 90 s'),
     'youtube':  (['1920x1080'], (60, 300), 'full-screen viewing; a longer read is fine'),
@@ -55,8 +55,8 @@ QUESTIONS = [
     ('audience', 'Who watches? Recommended: the role that asks the on-screen question, plus whoever approves their tooling.'),
     ('destination', 'Where does it play — booth | session | linkedin | youtube | vertical | internal? Recommended: booth — it '
                     'sets the loudest room and the smallest readable type; aspect is derived from it.'),
-    ('length_s', 'Target length in seconds? Recommended: 120–180 for a booth film — 6–10 beats at ~2.5 words/s, product '
-                 'beats 8–20 s each; the usable screen time in the recording is the ceiling.'),
+    ('length_s', 'Target length in seconds? Recommended: 30–45 for a booth trailer or 120–180 for a booth loop — '
+                 'product beats need 8–20 s each, and usable screen time in the recording is the ceiling.'),
     ('angle', 'Which telling? Recommended: run the pitch round (five tellings, three lines each) and pick by reaction; '
               'record the two rejected alternatives under ## Notes.'),
     ('narration', 'Narration mode — verbatim (the recording\'s own words) | restructured (rewritten around the message)? '
@@ -67,12 +67,12 @@ QUESTIONS = [
     ('storyboard', 'Review a storyboard first — yes | no? Recommended: yes for anything beyond two beats (plan in chat, '
                    'sketch sheet, then build).'),
     ('review', 'Review with me, or drive it? Recommended: with-me — ask at each pass; drive-it posts the same decisions '
-               'with reasons and keeps going. Rendering waits for you in both.'),
+               'with reasons and keeps going. Rendering waits for you unless end-to-end production was delegated.'),
     ('placeholders', 'May a placeholder beat ship — yes | no? Recommended: no — a placeholder holds a slot in the plan, '
                      'never a frame in the film.'),
     ('name', 'What is the film called in film.json / vo_script.py? Recommended: "film" — the sample uses it.'),
-    ('credit', 'The mandatory credit line, verbatim: "%s". It is stamped by build_film.py; the brief records it so '
-               'nobody plans a closing card that covers it.' % CREDIT),
+    ('credit', 'The default credit line, verbatim: "%s". If omission was requested, use none and set '
+               'film.json creator_credit=false; otherwise reserve its closing space.' % CREDIT),
 ]
 REQUIRED = [q[0] for q in QUESTIONS]
 
@@ -188,8 +188,8 @@ def validate(brief, qa=None):
         if v and v not in allowed:
             E.append('%s "%s" must be one of %s' % (field, v, '|'.join(allowed)))
     cr = ' '.join(str(f.get('credit', '')).split())
-    if cr and cr != CREDIT:
-        E.append('credit must read exactly "%s" (found "%s") — it is mandatory and verbatim' % (CREDIT, cr))
+    if cr and cr.lower() not in ('none', 'omit', 'false') and cr != CREDIT:
+        E.append('credit must read exactly "%s" (found "%s") — use the default verbatim, or none for an explicit omission' % (CREDIT, cr))
     hl = str(f.get('honesty_line', '')).strip()
     if hl and qa is not None and hl.lower() not in [p.lower() for p in qa.get('required_phrases', [])]:
         W.append('honesty_line is not in qa.json required_phrases — run brief.py --seed-qa --write')

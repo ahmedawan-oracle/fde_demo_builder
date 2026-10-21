@@ -22,6 +22,7 @@ Two kinds of narration:
             on the on-screen action of a screen recording you re-voice. Each beat has a
             time `budget`; if the rendered audio overruns it, the beat is re-rendered a
             notch faster (up to twice) and a WARN is printed if it still doesn't fit.
+            Overlapping beats or audio beyond the segment end now refuse assembly before replacing the track.
             (See references/multi-voice.md for how to derive offsets and budgets.)
 
 Usage:
@@ -44,9 +45,8 @@ import os
 import subprocess
 import sys
 
-import edge_tts
-
 from vo_script import VOICES, SCENES, PLACED
+from tts_providers import bump_speed, normalize_voice, render_voice
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VO_DIR = os.path.join(HERE, "vo")
@@ -62,31 +62,15 @@ def dur(path):
     return float(out.stdout.strip())
 
 
-def bump(rate, pct):
-    return f"+{int(rate.strip('+%')) + pct}%"
-
-
-async def tts(text, voice, rate, path, tries=4):
-    """Render one phrase; capture WordBoundary events for word-level sync."""
-    for i in range(tries):
-        try:
-            words, audio = [], b""
-            com = edge_tts.Communicate(text, voice, rate=rate, boundary="WordBoundary")
-            async for ch in com.stream():
-                if ch["type"] == "audio":
-                    audio += ch["data"]
-                elif ch["type"] == "WordBoundary":
-                    words.append({"t": round(ch["offset"] / 1e7, 3), "w": ch["text"]})
-            if not audio:
-                raise RuntimeError("no audio returned")
-            with open(path, "wb") as fh:
-                fh.write(audio)
-            return words
-        except Exception as e:                        # transient network errors are common
-            if i == tries - 1:
-                raise
-            print(f"  retry {i + 1} for {os.path.basename(path)}: {e}")
-            await asyncio.sleep(2 * (i + 1))
+def phase_speed(phase, voice):
+    key = "tempo" if voice["provider"] == "oci_speech" else "rate"
+    speed = phase.get(key, voice["speed"])
+    if voice["provider"] == "oci_speech":
+        if "rate" in phase:
+            raise ValueError("OCI Speech phases use tempo, not Edge rate")
+        if not 0.75 <= float(speed) <= 1.25:
+            raise ValueError("OCI Speech phase tempo must be between 0.75 and 1.25")
+    return speed
 
 
 def radioize(path):
@@ -114,7 +98,26 @@ def build_track(out_path, placed, total):
     subprocess.run(args, check=True, capture_output=True)
 
 
+def enforce_timing(name, total, phases, tolerance=0.05):
+    """Fail closed when generated narration cannot fit the declared clock."""
+    ordered = sorted(phases, key=lambda phase: float(phase["start"]))
+    offenders = []
+    for left, right in zip(ordered, ordered[1:]):
+        end = float(left["start"]) + float(left["dur"])
+        if float(right["start"]) - end < -tolerance:
+            offenders.append(
+                f"{left['name']} ends at {end:.2f}s; {right['name']} starts at {float(right['start']):.2f}s"
+            )
+    for phase in ordered:
+        end = float(phase["start"]) + float(phase["dur"])
+        if end > total + tolerance:
+            offenders.append(f"{phase['name']} ends at {end:.2f}s after total {total:.2f}s")
+    if offenders:
+        raise SystemExit("REFUSING: narration timing overlap in %s:\n  %s" % (name, "\n  ".join(offenders)))
+
+
 def write_meta(name, total, phases, words, emit_timing_js):
+    enforce_timing(name, total, phases)
     json.dump({"total": round(total, 3), "phases": phases},
               open(os.path.join(VO_DIR, f"{name}_phases.json"), "w"), indent=1)
     json.dump(words, open(os.path.join(VO_DIR, f"{name}_words.json"), "w"), indent=1)
@@ -134,9 +137,9 @@ async def gen_scene(name, spec):
     phases, words, files, t = [], {}, [], 0.0
     for ph in spec["phases"]:
         t += pad
-        voice, rate = VOICES[ph["voice"]]
+        voice = normalize_voice(VOICES[ph["voice"]])
         f = os.path.join(VO_DIR, f"{name}_{ph['name']}.mp3")
-        w = await tts(ph["text"], voice, ph.get("rate", rate), f)
+        w = await render_voice(ph["text"], voice, phase_speed(ph, voice), f)
         if ph.get("radio"):
             radioize(f)
         d = dur(f)
@@ -145,6 +148,7 @@ async def gen_scene(name, spec):
         files.append((f, t))
         t += d + gap + ph.get("pause", 0.0)      # optional dramatic silence after a phrase
     total = t - gap
+    enforce_timing(name, total, phases)
     build_track(os.path.join(HERE, f"vo_{name}.mp3"), files, total + 0.6)
     write_meta(name, total, phases, words, emit_timing_js=True)
     print(f"[{name}] total={total:.2f}s")
@@ -157,16 +161,16 @@ async def gen_placed(name, spec):
     seg_len = spec["length"]
     phases, words, placed = [], {}, []
     for b in spec["beats"]:
-        voice, rate = VOICES[b["voice"]]
+        voice = normalize_voice(VOICES[b["voice"]])
         f = os.path.join(VO_DIR, f"{name}_{b['name']}.mp3")
-        r = b.get("rate", rate)
+        speed = phase_speed(b, voice)
         for attempt in range(3):
-            w = await tts(b["text"], voice, r, f)
+            w = await render_voice(b["text"], voice, speed, f)
             d = dur(f)
             if d <= b["budget"] - 0.25 or attempt == 2:
                 break
-            r = bump(r, 7)
-            print(f"   {b['name']}: {d:.2f}s > budget {b['budget']}s -> rate {r}")
+            speed = bump_speed(str(voice["provider"]), speed, 7)
+            print(f"   {b['name']}: {d:.2f}s > budget {b['budget']}s -> speed {speed}")
         if b.get("radio"):
             radioize(f)
         d = dur(f)
@@ -176,6 +180,7 @@ async def gen_placed(name, spec):
         phases.append({"name": b["name"], "start": b["at"], "dur": round(d, 3)})
         words[b["name"]] = w
         placed.append((f, b["at"]))
+    enforce_timing(name, seg_len, phases)
     build_track(os.path.join(HERE, f"vo_{name}.mp3"), placed, seg_len)
     write_meta(name, seg_len, phases, words, emit_timing_js=False)
     print(f"[{name}] placed {len(placed)} beats over {seg_len}s")
