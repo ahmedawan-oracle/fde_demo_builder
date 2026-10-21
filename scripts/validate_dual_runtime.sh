@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Manifests and SKILL.md are UTF-8; do not let a cp1252 console locale decide how Python reads them.
+export PYTHONUTF8=1
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"

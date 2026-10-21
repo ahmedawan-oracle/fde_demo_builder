@@ -40,7 +40,7 @@ Do the following:
      and `references/multi-voice.md`.
 
 Also remind them that **the FDE Demo Builder credit ("Crafted with FDE Demo Builder · by Ahmed Awan") is
-mandatory** on the end screen — `assemble.sh` stamps and verifies it; never remove or alter it. And the hard rules: **no customer names or internal identifiers anywhere**
+on by default** on the end screen — `assemble.sh` stamps and verifies it; do not alter it, and omit it only when the brief explicitly asks (see `references/credit-footer.md`). And the hard rules: **no customer names or internal identifiers anywhere**
 (scenes, VO text, examples — use fictional brands and synthetic numbers), and **scrub every
 privacy leak** in recorded frames before sharing.
 

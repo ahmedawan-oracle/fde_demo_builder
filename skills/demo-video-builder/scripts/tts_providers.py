@@ -139,7 +139,9 @@ def _render_oci(text: str, voice: dict[str, object], speed: float, path: str) ->
                 code = str(error.get("code", "RequestFailed"))
             except (ValueError, TypeError):
                 code = "RequestFailed"
-            raise RuntimeError(f"OCI Speech failed: {code}; verify the selected profile, region and voice")
+            detail = (response_call.stderr or "").strip().replace("\n", " ")[-300:]
+            raise RuntimeError(f"OCI Speech failed: {code}; verify the selected profile, region and voice"
+                               + (f" ({detail})" if detail else ""))
         audio, words = parse_oci_response(json.loads(response.read_text(encoding="utf-8")), speed)
         source.write_bytes(audio)
         ffmpeg = ["ffmpeg", "-y", "-i", str(source)]

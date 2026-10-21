@@ -43,7 +43,8 @@ Clone this repo, then add it as a local plugin or through your team marketplace:
 
 ```bash
 git clone https://github.com/ahmedawan-oracle/fde_demo_builder.git
-claude plugin install fde-demo-builder --marketplace ahmedawan-oracle/fde_demo_builder
+claude plugin marketplace add ahmedawan-oracle/fde_demo_builder
+claude plugin install fde-demo-builder@fde-demo-builder
 ```
 
 For Codex, a team or personal marketplace can point its plugin entry at the clone. After that marketplace
@@ -63,9 +64,11 @@ In Codex, ask to scaffold a v1 demo, v2 story rebuild, or v5 production film, or
 The skill reads `commands/new-demo.md`, `commands/new-broll.md`, `commands/new-film.md`, or
 `agents/demo-qa-reviewer.md` respectively, so the behavior and acceptance criteria stay aligned with Claude.
 
-> **Mandatory credit.** Every video built with this plugin ends with a small centred footer line on the end
+> **Default credit.** Every video built with this plugin ends with a small centred footer line on the end
 > screen — *Crafted with FDE Demo Builder · by Ahmed Awan*. The build scripts stamp and verify it
-> automatically; QA fails any video without it. Please keep it.
+> automatically and QA fails a video without it, unless the brief explicitly asks for omission
+> (`film.json → "creator_credit": false`, `BRIEF.md → credit: none`), in which case QA verifies its absence.
+> Please keep it on.
 
 ## v5 — The picture layer
 

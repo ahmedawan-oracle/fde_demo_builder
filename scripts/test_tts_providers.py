@@ -33,18 +33,18 @@ def main() -> None:
         "audioStream": repr(base64.b64encode(audio)),
         "markers": {
             "sentences": [
-                {"words": [{"startTime": 0.96, "endTime": 1.2, "value": "Dupal"}]}
+                {"words": [{"startTime": 0.96, "endTime": 1.2, "value": "Acme"}]}
             ]
         },
     }
     decoded, words = parse_oci_response(payload, tempo=0.96)
     assert decoded == audio
-    assert words == [{"t": 1.0, "w": "Dupal"}]
+    assert words == [{"t": 1.0, "w": "Acme"}]
     tts_providers._speech_verifiers["small.en"] = SimpleNamespace(
-        transcribe=lambda path, **options: ([SimpleNamespace(text="Dupal service teams act sooner.")], None)
+        transcribe=lambda path, **options: ([SimpleNamespace(text="Acme service teams act sooner.")], None)
     )
     with patch.dict(os.environ, {"FDE_WHISPER_MODEL_PATH": ""}):
-        tts_providers.verify_audio_content("Dupal service teams act sooner.", "unused.mp3")
+        tts_providers.verify_audio_content("Acme service teams act sooner.", "unused.mp3")
         try:
             tts_providers.verify_audio_content("Our notebook builds a scored district summary.", "unused.mp3")
         except RuntimeError:

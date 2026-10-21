@@ -32,7 +32,7 @@ Do the following:
      agent; Codex uses a separate no-edit review pass. Fix anything it flags and rebuild.
 
 Also remind them that **the FDE Demo Builder credit ("Crafted with FDE Demo Builder · by Ahmed Awan") is
-mandatory** on the end screen — `build.py` stamps and verifies it; never remove or alter it. And the two hard rules: **no customer names anywhere in the video**, and **scrub every
+on by default** on the end screen — `build.py` stamps and verifies it; do not alter it, and omit it only when the brief explicitly asks (see `references/credit-footer.md`). And the two hard rules: **no customer names anywhere in the video**, and **scrub every
 privacy leak** (address bar/tokens, bookmarks, extension badges, usernames, internal names) before sharing.
 Point them at `${CLAUDE_PLUGIN_ROOT}/skills/demo-video-builder/references/` for the detailed method.
 
